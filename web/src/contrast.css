@@ -2,6 +2,14 @@
 .discovery-card p {
   color: var(--ink);
 }
+.map-source-credit {
+  margin-top: 24px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  font-size: 11px;
+  line-height: 1.8;
+  color: var(--muted);
+}
 :root {
   --readable-accent: #424ecc;
 }

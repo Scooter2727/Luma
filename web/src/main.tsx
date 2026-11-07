@@ -17,8 +17,6 @@ import {
   MapPin,
   TrafficCone,
   Layers,
-  Plus,
-  Minus,
   X,
   Check,
   ChevronRight,
@@ -219,7 +217,7 @@ function App() {
       zoom: 14.7,
       minZoom: 10,
       maxZoom: 19,
-      attributionControl: { compact: true },
+      attributionControl: false,
     });
     map.current = m;
     m.on("load", async () => {
@@ -573,29 +571,11 @@ function App() {
           aria-label="Toronto accessibility map"
         >
           <div ref={container} className="map" />
-          <div className="map-actions">
-            <button aria-label="Zoom in" onClick={() => map.current?.zoomIn()}>
-              <Plus />
-            </button>
-            <button
-              aria-label="Zoom out"
-              onClick={() => map.current?.zoomOut()}
-            >
-              <Minus />
-            </button>
-            <button aria-label="Find my location" onClick={locate}>
-              <LocateFixed />
-            </button>
-          </div>
           {mapError && (
             <div className="map-warning">
               Some map tiles could not load. Location lists remain available.
             </div>
           )}
-          <div className="map-credit">
-            Location data: City of Toronto · OpenStreetMap contributors /
-            EmbedEarth
-          </div>
         </section>
         <section
           className="panel"
@@ -1128,6 +1108,9 @@ function App() {
               </div>
             </>
           )}
+          <footer className="map-source-credit" aria-label="Map attribution">
+            Map: <a href="https://openfreemap.org/" target="_blank" rel="noreferrer">OpenFreeMap</a> · © <a href="https://openmaptiles.org/" target="_blank" rel="noreferrer">OpenMapTiles</a> · © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap contributors</a>
+          </footer>
           {error && (
             <div className="error" role="alert">
               <span>{error}</span>
