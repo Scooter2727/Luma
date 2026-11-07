@@ -10,9 +10,21 @@ from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field, field_validator
+from .runtime import is_vercel
 
 REPORT_DB = Path(__file__).resolve().parents[1] / 'data/out/luma-reports.sqlite'
 router = APIRouter(prefix='/api/reports', tags=['Reports'])
+DISABLED_REASON = 'Report saving is disabled on this deployment. No report has been saved.'
+
+
+@router.get('/status')
+def report_status():
+    return {'enabled': not is_vercel(), 'reason': DISABLED_REASON if is_vercel() else None}
+
+
+def require_reporting():
+    if is_vercel():
+        raise HTTPException(503, DISABLED_REASON)
 
 
 def connect():
@@ -48,6 +60,7 @@ class ReportRequest(BaseModel):
 
 @router.post('', status_code=201)
 def create_report(req: ReportRequest):
+    require_reporting()
     report = dict(req.model_dump(), id=str(uuid4()), created_at=datetime.now(timezone.utc).isoformat(), status='unverified')
     token = secrets.token_urlsafe(32)
     with connect() as db:
@@ -57,6 +70,7 @@ def create_report(req: ReportRequest):
 
 @router.get('/{report_id}')
 def read_report(report_id: UUID):
+    require_reporting()
     with connect() as db:
         row = db.execute('SELECT payload FROM reports WHERE id=?', (str(report_id),)).fetchone()
     if not row:
@@ -66,6 +80,7 @@ def read_report(report_id: UUID):
 
 @router.delete('/{report_id}', status_code=204)
 def delete_report(report_id: UUID, x_report_token: str = Header('')):
+    require_reporting()
     with connect() as db:
         row = db.execute('SELECT delete_token FROM reports WHERE id=?', (str(report_id),)).fetchone()
         if not row:

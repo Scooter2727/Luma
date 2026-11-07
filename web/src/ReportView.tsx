@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
   BellOff,
@@ -117,8 +117,33 @@ export default function ReportView({
     [error, setError] = useState(""),
     [confirmation, setConfirmation] = useState<ReportRecord | null>(null);
   const notesInput = useRef<HTMLTextAreaElement>(null);
+  const [availability, setAvailability] = useState({
+    enabled: false,
+    reason: "Checking report availability…",
+  });
+  useEffect(() => {
+    const controller = new AbortController();
+    request<{ enabled: boolean; reason: string | null }>(
+      "/api/reports/status",
+      { signal: controller.signal },
+    )
+      .then((status) =>
+        setAvailability({
+          enabled: status.enabled,
+          reason: status.reason || "",
+        }),
+      )
+      .catch(() => {
+        if (!controller.signal.aborted)
+          setAvailability({
+            enabled: false,
+            reason: "Reporting is unavailable. No report has been saved.",
+          });
+      });
+    return () => controller.abort();
+  }, []);
   async function submit() {
-    if (!valid) return;
+    if (!valid || !availability.enabled) return;
     setBusy(true);
     setError("");
     try {
@@ -188,6 +213,11 @@ export default function ReportView({
           </span>
         )}
       </header>
+      {!availability.enabled && (
+        <p className="helper" role="status">
+          {availability.reason}
+        </p>
+      )}
       {confirmation ? (
         <>
           <div className="report-confirmation">
@@ -313,12 +343,13 @@ export default function ReportView({
             rows={4}
           />
           <p className="helper">
-            Reports are saved in Luma for review. They are not automatically
-            sent to the City or used to change routes.
+            {availability.enabled
+              ? "Reports are saved in Luma for review. They are not automatically sent to the City or used to change routes."
+              : availability.reason}
           </p>
           <button
             className="dark-button"
-            disabled={busy || !valid}
+            disabled={busy || !valid || !availability.enabled}
             type="submit"
           >
             {busy ? "Saving report…" : "Save report"}

@@ -24,6 +24,35 @@ npm run dev
 
 Open http://localhost:5173 . To view on a phone on the same Wi-Fi, use the Network URL printed by Vite and allow local network access in the firewall. Ordinary HTTP over a LAN may not permit device geolocation; the preset start works without it. HTTPS is needed for geolocation on most non-localhost devices. The Vite proxy forwards API requests, so the phone only needs port 5173.
 
+## Vercel deployment
+
+`vercel.json` defines two services in one project:
+
+| Service | Build context | Entrypoint/output | Public paths | Bindings |
+| --- | --- | --- | --- | --- |
+| `app` | Repository root | Vite → `dist/` | Everything outside `/api/*` | None |
+| `backend` | Repository root | FastAPI `backend.app:app` | `/api/*` only | None |
+
+The backend intentionally uses `root: "."`, rather than `root: "backend"`: it imports the `backend` Python package and reads the sibling `data/` tree. Root `pyproject.toml` supplies its Python 3.12 runtime dependencies and entrypoint. Vercel builds the Vite and Python services independently. Keep the Vercel project Root Directory at the repository root and let the checked-in service settings choose frameworks/build commands.
+
+The more-specific `/api/(.*)` rewrite precedes the frontend catch-all. Vercel passes the original `/api/...` path through, matching the existing FastAPI routes. Browser calls already use relative `/api/...` URLs, so deployed requests share the page's origin and need no hardcoded hostname or frontend URL variable. There are no server-side service-to-service calls to bind: the Vite output is static. A runtime binding would become necessary if a server-side proxy were later added; do not expose a binding URL through `VITE_*` or invent one during a build. See [Services routing](https://vercel.com/docs/services/routing) and [Service bindings](https://vercel.com/docs/services/bindings).
+
+Function settings include the five source files needed for routing and exclude local environments, node modules, generated caches, frontend assets and tests from the Python bundle. `.vercelignore` also excludes local state and environment files from source uploads. No source data is moved or downloaded at request time.
+
+Walking and transit caches use the system temporary directory when Vercel injects `VERCEL=1`; local development still uses `data/out/`. `LUMA_CACHE_DIR` is an optional writable cache directory override, not a service binding. Caches are disposable and rebuild on cold instances, so initial routing/bus requests can be slower. The retained timetable's date range still applies.
+
+**Hosted report saving is intentionally disabled**, as requested. `GET /api/reports/status` advertises availability to the UI. Vercel report POST/read/delete endpoints return 503 before opening SQLite, and the interface disables Save report with an explanation. Local reports continue to persist in SQLite. Do not move report storage into `/tmp` and call it durable: [Vercel does not provide persistent local SQLite storage](https://vercel.com/kb/guide/is-sqlite-supported-in-vercel). A shared persistent database is required before hosted reporting can be enabled.
+
+To test the integrated deployment:
+
+```powershell
+npx vercel login
+npx vercel link
+npx vercel dev --listen 3001
+```
+
+Open the printed URL and test `/api/health`, `/api/reports/status`, search, a walking journey, and a scheduled bus journey. `vercel dev` owns the `/api/*` routing. The Vite proxy is disabled under `VERCEL=1`; standalone `npm run dev` retains its local backend proxy, optionally overridden with `LUMA_LOCAL_API_URL`. No manual backend URL is needed on Vercel. Authentication and account linking must be completed by the repository owner; no Vercel project or deployment has been created by these changes.
+
 ## Interface and demo flow
 
 The seven supplied HTML designs guide the rebuilt React interface: onboarding, Home, one-route-at-a-time comparison, navigation preview, crossing view, Report, and Settings. Atkinson Hyperlegible, large controls, visible labels, strong borders and the existing Luma palette replace the smaller layout. Desktop retains the existing map alongside the controls. On phones, Home and task screens fill the display; use the map button to open the unchanged map and category filters.

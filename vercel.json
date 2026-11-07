@@ -1,0 +1,26 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "app": {
+      "root": ".",
+      "framework": "vite",
+      "buildCommand": "npm run build",
+      "outputDirectory": "dist"
+    },
+    "backend": {
+      "root": ".",
+      "framework": "fastapi",
+      "entrypoint": "backend.app:app",
+      "functions": {
+        "backend/app.py": {
+          "includeFiles": "data/{WAYFINDER_ALL_LOCATIONS.csv,ttc_stops.csv,sources/{pedestrian-network.geojson,centreline.geojson,ttc-gtfs.zip}}",
+          "excludeFiles": "{node_modules/**,.venv/**,web/**,public/**,dist/**,artifacts/**,data/out/**,backend/test_*.py,.pytest_cache/**,test-results/**,playwright-report/**}"
+        }
+      }
+    }
+  },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": { "service": "backend" } },
+    { "source": "/(.*)", "destination": { "service": "app" } }
+  ]
+}

@@ -25,6 +25,41 @@ async function tryWalk(page: Page) {
   ).toBeVisible({ timeout: 65000 });
 }
 
+test("hosted report saving is visibly disabled without creating records", async ({
+  page,
+}) => {
+  await page.route("**/api/reports/status", (r) =>
+    r.fulfill({
+      json: {
+        enabled: false,
+        reason:
+          "Report saving is disabled on this deployment. No report has been saved.",
+      },
+    }),
+  );
+  let writes = 0;
+  await page.route("**/api/reports", (r) => {
+    writes++;
+    return r.abort();
+  });
+  await boot(page);
+  await page.getByRole("button", { name: "Report", exact: true }).click();
+  await expect(
+    page.getByRole("status").filter({ hasText: "Report saving is disabled" }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Signal silent", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Save report", exact: true }),
+  ).toBeDisabled();
+  await expect(
+    page.getByRole("heading", { name: "Report saved", exact: true }),
+  ).toHaveCount(0);
+  expect(writes).toBe(0);
+  await audit(page);
+});
+
 test("five-step onboarding saves direction, crossing and display choices", async ({
   page,
 }) => {

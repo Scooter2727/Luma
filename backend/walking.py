@@ -8,7 +8,7 @@ import networkx as nx
 from shapely.geometry import LineString,Point,shape
 from shapely.strtree import STRtree
 
-ROOT=Path(__file__).resolve().parents[1]
+from .runtime import ROOT,cache_directory
 SCALE_X=111195*math.cos(math.radians(43.7));SCALE_Y=111195
 def xy(c):return (c[0]*SCALE_X,c[1]*SCALE_Y)
 def ll(p):return (p[0]/SCALE_X,p[1]/SCALE_Y)
@@ -117,7 +117,7 @@ def network():
     global _network
     with _network_lock:
         if _network is None:
-            folder=ROOT/'data/out';folder.mkdir(exist_ok=True)
+            folder=cache_directory()
             cache=folder/'pedestrian-network-v3.pickle'
             sources=[Path(__file__),ROOT/'data/WAYFINDER_ALL_LOCATIONS.csv',ROOT/'data/ttc_stops.csv',ROOT/'data/sources/pedestrian-network.geojson',ROOT/'data/sources/centreline.geojson']
             stamp=[(p.stat().st_mtime_ns,p.stat().st_size) for p in sources]

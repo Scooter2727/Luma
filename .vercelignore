@@ -1,0 +1,12 @@
+node_modules
+.venv
+dist
+artifacts
+data/out
+__pycache__
+**/__pycache__
+.pytest_cache
+test-results
+playwright-report
+.env*
+*.log

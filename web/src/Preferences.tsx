@@ -432,9 +432,10 @@ export function Settings(
           <h2>Stored information</h2>
           <p>
             Preferences, saved destinations, last trip and report history are
-            stored in this browser. Reports you save are also stored on this
-            prototype’s server. They are unverified and are not sent to the
-            City.
+            stored in this browser. Where report saving is available, saved
+            reports are also stored on this prototype’s server. Reporting
+            availability is shown before saving. Saved reports are unverified
+            and are not sent to the City.
           </p>
           <p>
             GPS and microphone access are requested only when you use those

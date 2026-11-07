@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 from threading import Lock
 import networkx as nx
 from .walking import ROOT,distance,walk_details,weight
+from .runtime import cache_directory
 TZ=ZoneInfo('America/Toronto')
 def seconds(value):
     h,m,s=map(int,value.split(':'));return h*3600+m*60+s
@@ -17,7 +18,7 @@ def database():
 
 @lru_cache(maxsize=1)
 def _database():
-    archive=ROOT/'data/sources/ttc-gtfs.zip';folder=ROOT/'data/out';folder.mkdir(exist_ok=True)
+    archive=ROOT/'data/sources/ttc-gtfs.zip';folder=cache_directory()
     path=folder/'ttc-schedule-v2.sqlite'
     if path.exists() and path.stat().st_mtime>=archive.stat().st_mtime:return path
     # Construct under a temporary name: interrupted builds never become valid caches.
