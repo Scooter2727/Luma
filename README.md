@@ -28,10 +28,12 @@ Open http://localhost:5173 . To view on a phone on the same Wi-Fi, use the Netwo
 
 - Explore the map; zoom in to reveal individual category icons. Click a marker for its purpose and source.
 - All feature categories are enabled by default, including tactile paving, transit stops and libraries. Use filters to hide categories. Zoomed-out clusters show counts; the simplified background keeps street names while removing building and rail detail.
-- Use View list to browse locations without clicking the map.
+- Search for destinations by name or select a location icon on the map.
 - Select Try a walk for Union Station → Nathan Phillips Square, or search for a destination.
 - Compare routes, read a summary aloud, and choose Preview walk for a clearly labelled step simulation.
 - Settings offers the requested Luma, red–green, blue–yellow and high-contrast palettes, speech speed, larger text and screen-reader announcements.
+
+The interface uses a task-focused layout: Home offers voice search (where browser support permits), a Type action, a suggested destination, and expandable map filters. Settings groups controls into Voice, Crossings, Display, Screen reader, and About & data. On phones, Settings opens as a full-height view. The walking simulation hides planning controls and shows one main instruction, a next-step preview, Repeat/Pause/Where am I/End, and the spoken text. Its Where am I action describes the simulated position, not live GPS. Live street navigation, clock-bearing guidance, onboarding and community reporting remain future work; mockup example values are not used as real route data.
 
 ## Scope and limitations
 

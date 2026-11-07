@@ -4,6 +4,13 @@ import * as maplibregl from "maplibre-gl";
 import mapWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import {
   Search,
+  Mic,
+  Keyboard,
+  Bookmark,
+  Eye,
+  Info,
+  Minus,
+  Plus,
   ArrowUpRight,
   ArrowLeft,
   ArrowRight,
@@ -33,6 +40,7 @@ import {
 import "maplibre-gl/dist/maplibre-gl.css";
 import "./style.css";
 import "./contrast.css";
+import "./focused.css";
 maplibregl.setWorkerUrl(mapWorkerUrl);
 type Coord = [number, number];
 type Place = { id: string; name: string; subtitle: string; coordinates: Coord };
@@ -172,12 +180,16 @@ function App() {
     [screenReader, setScreenReader] = useState(() =>
       saved("screenReader", false),
     ),
-    [large, setLarge] = useState(() => saved("large", false)),
-    [list, setList] = useState(false),
-    [bounds, setBounds] = useState([-79.405, 43.64, -79.365, 43.665]);
+    [large, setLarge] = useState(() => saved("large", false));
   const [sim, setSim] = useState(false),
     [playing, setPlaying] = useState(false),
     [step, setStep] = useState(0);
+  const [settingsSection, setSettingsSection] = useState<string | null>(null);
+  const searchInput = useRef<HTMLInputElement>(null);
+  const [listening, setListening] = useState(false);
+  const [typing, setTyping] = useState(false);
+  const recognitionRef = useRef<{ stop: () => void } | null>(null);
+  useEffect(()=>{const panel=document.getElementById('panel');if(panel)panel.scrollTop=0;},[view,settingsSection,selected]);
   const selectedRef = useRef(setSelected);
   selectedRef.current = setSelected;
   useEffect(() => {
@@ -256,8 +268,12 @@ function App() {
         type: "symbol",
         source: "locations",
         filter: ["has", "point_count"],
-        layout: {"text-field": ["get", "point_count_abbreviated"], "text-font": ["Noto Sans Regular"], "text-size": 13},
-        paint: {"text-color": "#ffffff"},
+        layout: {
+          "text-field": ["get", "point_count_abbreviated"],
+          "text-font": ["Noto Sans Regular"],
+          "text-size": 13,
+        },
+        paint: { "text-color": "#ffffff" },
       });
       m.addLayer({
         id: "points",
@@ -335,10 +351,7 @@ function App() {
       });
       setMapReady(true);
     });
-    m.on("moveend", () => {
-      const b = m.getBounds();
-      setBounds([b.getWest(), b.getSouth(), b.getEast(), b.getNorth()]);
-    });
+
     let failures = 0;
     m.on("error", () => {
       if (++failures > 4) setMapError(true);
@@ -450,7 +463,7 @@ function App() {
           coordinates: c,
         });
         map.current?.flyTo({ center: c, zoom: 16 });
-        setNotice(
+        speak(
           `Location found. Accuracy approximately ${Math.round(p.coords.accuracy)} metres.`,
         );
       },
@@ -497,35 +510,93 @@ function App() {
       setBusy(false);
     }
   }
-  const visible = data.filter(
-    (f) =>
-      active.includes(f.properties.kind) &&
-      f.geometry.coordinates[0] >= bounds[0] &&
-      f.geometry.coordinates[0] <= bounds[2] &&
-      f.geometry.coordinates[1] >= bounds[1] &&
-      f.geometry.coordinates[1] <= bounds[3],
-  );
-  const nearby = [...visible]
-    .sort((a, b) => {
-      const c = map.current?.getCenter() || { lng: -79.383, lat: 43.652 };
-      return (
+  function voiceSearch() {
+    type Recognition = {
+      lang: string;
+      interimResults: boolean;
+      onresult:
+        ((event: { results: { transcript: string }[][] }) => void) | null;
+      onerror: (() => void) | null;
+      onend: (() => void) | null;
+      start: () => void;
+      stop: () => void;
+    };
+    const api = window as unknown as {
+      SpeechRecognition?: new () => Recognition;
+      webkitSpeechRecognition?: new () => Recognition;
+    };
+    const Constructor = api.SpeechRecognition || api.webkitSpeechRecognition;
+    if (!Constructor) {
+      setTyping(true);
+      setError(
+        "Voice search is unavailable in this browser. Type your destination below.",
+      );
+      searchInput.current?.focus();
+      return;
+    }
+    if (listening) {
+      recognitionRef.current?.stop();
+      return;
+    }
+    window.speechSynthesis?.cancel();
+    const recognition = new Constructor();
+    recognitionRef.current = recognition;
+    recognition.lang = "en-CA";
+    recognition.interimResults = false;
+    recognition.onresult = (event) => {
+      setTyping(true);
+      setQuery(event.results[0][0].transcript);
+      searchInput.current?.focus();
+    };
+    recognition.onerror = () => {
+      setError("Could not hear a destination. Try again or type it below.");
+      setListening(false);
+    };
+    recognition.onend = () => setListening(false);
+    try {
+      recognition.start();
+      setListening(true);
+    } catch {
+      setError("Microphone access is unavailable. Please type a destination.");
+    }
+  }
+  useEffect(() => () => recognitionRef.current?.stop(), []);
+  useEffect(() => {
+    if (sim) document.getElementById("navigation-title")?.focus();
+  }, [sim]);
+  function endPreview() {
+    setSim(false);
+    setPlaying(false);
+    window.speechSynthesis?.cancel();
+    setTimeout(() => document.getElementById("preview-walk")?.focus(), 0);
+  }
+  function simulatedLocation() {
+    if (!route) return;
+    const c = route.steps[step].coordinates;
+    const signals = data.filter((f) => f.properties.kind === "signal");
+    const closest = signals.sort(
+      (a, b) =>
         Math.hypot(
-          a.geometry.coordinates[0] - c.lng,
-          a.geometry.coordinates[1] - c.lat,
+          a.geometry.coordinates[0] - c[0],
+          a.geometry.coordinates[1] - c[1],
         ) -
         Math.hypot(
-          b.geometry.coordinates[0] - c.lng,
-          b.geometry.coordinates[1] - c.lat,
-        )
-      );
-    })
-    .slice(0, list ? 40 : 4);
+          b.geometry.coordinates[0] - c[0],
+          b.geometry.coordinates[1] - c[1],
+        ),
+    )[0];
+    speak(
+      closest
+        ? `Simulated position near ${closest.properties.name}. This is the route preview, not your GPS location.`
+        : "This is a simulated route position.",
+    );
+  }
   return (
-    <div className="app">
+    <div className={"app" + (sim ? " navigating" : "")}>
       <a className="skip" href="#panel">
         Skip map to accessible controls
       </a>
-      <aside className="rail">
+      <aside className="rail" hidden={sim}>
         <a
           href="#"
           className="brand"
@@ -553,6 +624,7 @@ function App() {
               key={n.id}
               onClick={() => {
                 setView(n.id);
+                setSettingsSection(null);
                 setSelected(null);
               }}
               className={view === n.id ? "active" : ""}
@@ -567,6 +639,7 @@ function App() {
       <main className="workspace">
         <section
           className="map-shell"
+          inert={sim}
           data-ready={mapReady}
           aria-label="Toronto accessibility map"
         >
@@ -578,8 +651,10 @@ function App() {
           )}
         </section>
         <section
-          className="panel"
+          className={"panel" + (view === "settings" ? " settings-panel" : "")}
+          hidden={sim}
           id="panel"
+          data-loaded={loaded}
           tabIndex={-1}
           aria-label={
             view === "explore"
@@ -592,10 +667,29 @@ function App() {
           <div className="mobile-handle" />
           {view === "explore" && !selected && (
             <>
-              <h1>Luma</h1>
-              <div className="search-box">
+              <h1 className="announcer">Luma</h1>
+              <button
+                className="voice-destination"
+                aria-pressed={listening}
+                onClick={voiceSearch}
+              >
+                <Mic size={32} />
+                {listening ? "Listening… tap to stop" : "Say where to go"}
+              </button>
+              <div className="home-actions">
+                <button onClick={() => {setTyping(true);setTimeout(()=>searchInput.current?.focus(),0);}}>
+                  <Keyboard size={24} />
+                  Type
+                </button>
+                <button onClick={() => plan(initialEnd)}>
+                  <Bookmark size={24} />
+                  Nathan Phillips Square
+                </button>
+              </div>
+              <div className="search-box" hidden={!typing && !query}>
                 <Search size={21} />
                 <input
+                  ref={searchInput}
                   aria-label="Search a destination or intersection"
                   placeholder="Where would you like to go?"
                   value={query}
@@ -635,111 +729,54 @@ function App() {
                   <div className="quick-actions">
                     <button onClick={locate}>
                       <LocateFixed size={16} />
-                      Use my location
+                      Where am I?
                     </button>
                     <button onClick={() => plan()}>
                       <Footprints size={16} />
                       Try a walk
                     </button>
                   </div>
-                  <div className="section-heading">
-                    <h2>Map features</h2>
-                    <Layers size={17} />
-                  </div>
-                  <p className="muted small">
-                    Choose the features you want to see.
-                  </p>
-                  <div className="filters">
-                    {kinds.map((k) => (
-                      <button
-                        key={k.id}
-                        className={
-                          "filter " + (active.includes(k.id) ? "on" : "")
-                        }
-                        aria-pressed={active.includes(k.id)}
-                        onClick={() =>
-                          setActive((a) =>
-                            a.includes(k.id)
-                              ? a.filter((x) => x !== k.id)
-                              : [...a, k.id],
-                          )
-                        }
-                      >
-                        <k.icon size={17} />
-                        {k.name}
-                        {active.includes(k.id) && <Check size={13} />}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="discovery-card">
-                    <div className="discovery-icon">
-                      <Footprints size={24} />
+                  <details className="simple-details">
+                    <summary>
+                      <Layers size={21} />
+                      Map features
+                    </summary>{" "}
+                    <p className="muted small">
+                      Choose the features you want to see.
+                    </p>
+                    <div className="filters">
+                      {kinds.map((k) => (
+                        <button
+                          key={k.id}
+                          className={
+                            "filter " + (active.includes(k.id) ? "on" : "")
+                          }
+                          aria-pressed={active.includes(k.id)}
+                          onClick={() =>
+                            setActive((a) =>
+                              a.includes(k.id)
+                                ? a.filter((x) => x !== k.id)
+                                : [...a, k.id],
+                            )
+                          }
+                        >
+                          <k.icon size={17} />
+                          {k.name}
+                          {active.includes(k.id) && <Check size={13} />}
+                        </button>
+                      ))}
                     </div>
-                    <div>
-                      <strong>Walking routes</strong>
-                      <p>Find a route that favours audible signals.</p>
-                      <button onClick={() => plan()}>
-                        Plan a walk <ArrowRight size={16} />
-                      </button>
-                    </div>
-                  </div>
-                  <div className="section-heading">
-                    <h2>
-                      {list
-                        ? "Locations in this area"
-                        : "Nearby locations"}
-                    </h2>
-                    <button
-                      className="text-button"
-                      onClick={() => setList(!list)}
-                    >
-                      {list ? "Show less" : "View list"}{" "}
-                      <ChevronRight size={14} />
-                    </button>
-                  </div>
-                  <div className="nearby">
-                    {!loaded ? (
-                      <p className="muted">Loading Toronto locations…</p>
-                    ) : nearby.length ? (
-                      nearby.map((f) => {
-                        const k = kinds.find(
-                          (k) => k.id === f.properties.kind,
-                        )!;
-                        return (
-                          <button
-                            className="place-row"
-                            key={f.properties.id}
-                            onClick={() => {
-                              setSelected(f);
-                              map.current?.easeTo({
-                                center: f.geometry.coordinates,
-                                zoom: 17,
-                              });
-                            }}
-                          >
-                            <span className={"place-icon " + k.id}>
-                              <k.icon size={19} />
-                            </span>
-                            <span>
-                              <strong>{f.properties.name}</strong>
-                              <small>{k.short}</small>
-                            </span>
-                            <ChevronRight size={17} />
-                          </button>
-                        );
-                      })
-                    ) : (
-                      <p className="muted">
-                        No matching features in this view. Zoom out or enable
-                        another filter.
-                      </p>
-                    )}
-                  </div>
-                  <div className="data-foot">
-                    <span className="online-dot" />
-                    {data.length.toLocaleString()} mapped locations · Real
-                    Toronto data
-                  </div>
+                  </details>
+                  <button
+                    className="secondary full example-walk"
+                    onClick={() => plan()}
+                  >
+                    <Footprints size={20} />
+                    Try a walk
+                    <ArrowRight size={18} />
+                  </button>
+
+
                 </>
               )}
             </>
@@ -870,24 +907,30 @@ function App() {
                   Swap start and destination
                 </button>
               </div>
-              <div className="route-prefs">
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={audible}
-                    onChange={(e) => setAudible(e.target.checked)}
-                  />
-                  Prefer audible crossings
-                </label>
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={fewer}
-                    onChange={(e) => setFewer(e.target.checked)}
-                  />
-                  Prefer fewer crossings
-                </label>
-              </div>
+              <details className="simple-details">
+                <summary>
+                  <SlidersHorizontal size={20} />
+                  Crossing preferences
+                </summary>{" "}
+                <div className="route-prefs">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={audible}
+                      onChange={(e) => setAudible(e.target.checked)}
+                    />
+                    Prefer audible crossings
+                  </label>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={fewer}
+                      onChange={(e) => setFewer(e.target.checked)}
+                    />
+                    Prefer fewer crossings
+                  </label>
+                </div>
+              </details>
               <button
                 className="primary"
                 disabled={busy || !end.name || !!query}
@@ -961,6 +1004,7 @@ function App() {
                       Read summary
                     </button>
                     <button
+                      id="preview-walk"
                       className="primary"
                       onClick={() => {
                         setStep(0);
@@ -1000,117 +1044,253 @@ function App() {
           {view === "settings" && (
             <>
               <h1>Settings</h1>
-              <h2 className="setting-heading">Colour theme</h2>
-              <div className="themes">
-                {[
-                  {
-                    id: "default",
-                    name: "Luma",
-                    colors: ["#5865F2", "#FF8A4C", "#2CCBA8"],
-                  },
-                  {
-                    id: "red-green",
-                    name: "Red–green friendly",
-                    colors: ["#0072B2", "#E69F00", "#17212F"],
-                  },
-                  {
-                    id: "blue-yellow",
-                    name: "Blue–yellow friendly",
-                    colors: ["#9B3658", "#254653", "#F0F0EB"],
-                  },
-                  {
-                    id: "contrast",
-                    name: "High contrast",
-                    colors: ["#000", "#FFF", "#FFD600"],
-                  },
-                ].map((t) => (
-                  <button
-                    className={theme === t.id ? "chosen" : ""}
-                    key={t.id}
-                    aria-pressed={theme === t.id}
-                    onClick={() => setTheme(t.id)}
-                  >
-                    <span className="swatches">
-                      {t.colors.map((c) => (
-                        <i key={c} style={{ background: c }} />
-                      ))}
-                    </span>
-                    {t.name}
-                    {theme === t.id && <Check size={16} />}
-                  </button>
-                ))}
-              </div>
-              <label className="setting-toggle">
-                <span>
-                  <strong>Larger text</strong>
-                  <small>More room for every word</small>
-                </span>
-                <input
-                  type="checkbox"
-                  checked={large}
-                  onChange={(e) => setLarge(e.target.checked)}
-                />
-              </label>
-              <h2 className="setting-heading">Spoken directions</h2>
-              <label className="range-label" htmlFor="speech-rate">
-                Speech speed <strong>{rate.toFixed(1)}×</strong>
-              </label>
-              <input
-                id="speech-rate"
-                className="range"
-                type="range"
-                min="0.6"
-                max="2"
-                step="0.1"
-                value={rate}
-                onChange={(e) => setRate(Number(e.target.value))}
-              />
-              <label className="setting-toggle">
-                <span>
-                  <strong>Screen reader announcements</strong>
-                  <small>Use announcements instead of the app voice</small>
-                </span>
-                <input
-                  type="checkbox"
-                  checked={screenReader}
-                  onChange={(e) => {
-                    setScreenReader(e.target.checked);
-                    window.speechSynthesis?.cancel();
-                  }}
-                />
-              </label>
-              <button
-                className="secondary full"
-                onClick={() =>
-                  speak(
-                    "This is a sample Luma instruction. Your next crossing is ahead.",
-                  )
-                }
-              >
-                <Volume2 size={18} />
-                Test your voice settings
-              </button>
-              <div className="about-card">
-                <img src="/brand/luma-symbol.png" alt="" />
-                <h2>About Luma</h2>
-                <p className="small">
-                  A hackathon route-planning prototype. Location data: City of
-                  Toronto, OpenStreetMap contributors / EmbedEarth (ODbL), TTC
-                  and cited providers.
-                </p>
-                <a
-                  href="https://www.openstreetmap.org/copyright"
-                  target="_blank"
-                  rel="noreferrer"
+              {settingsSection && (
+                <button
+                  className="back-button"
+                  onClick={() => setSettingsSection(null)}
                 >
-                  OpenStreetMap attribution <ExternalLink size={13} />
-                </a>
-              </div>
+                  <ArrowLeft size={20} />
+                  All settings
+                </button>
+              )}
+              {!settingsSection && (
+                <>
+                  <div className="speed-card">
+                    <h2>Speech speed</h2>
+                    <div>
+                      <button
+                        aria-label="Decrease speech speed"
+                        onClick={() =>
+                          setRate((r) =>
+                            Math.max(0.6, Math.round((r - 0.1) * 10) / 10),
+                          )
+                        }
+                      >
+                        <Minus />
+                      </button>
+                      <strong>{rate.toFixed(1)}×</strong>
+                      <button
+                        aria-label="Increase speech speed"
+                        onClick={() =>
+                          setRate((r) =>
+                            Math.min(2, Math.round((r + 0.1) * 10) / 10),
+                          )
+                        }
+                      >
+                        <Plus />
+                      </button>
+                    </div>
+                    <button
+                      className="secondary full"
+                      onClick={() =>
+                        speak(
+                          "This is a sample Luma instruction. Your next crossing is ahead.",
+                        )
+                      }
+                    >
+                      <Volume2 size={22} />
+                      Test voice
+                    </button>
+                  </div>
+                  <div className="settings-grid">
+                    {[
+                      { id: "voice", label: "Voice", icon: Volume2 },
+                      { id: "crossings", label: "Crossings", icon: Footprints },
+                      { id: "display", label: "Display", icon: Eye },
+                      {
+                        id: "reader",
+                        label: "Screen reader",
+                        icon: Headphones,
+                      },
+                      { id: "about", label: "About & data", icon: Info },
+                    ].map((item) => (
+                      <button
+                        key={item.id}
+                        onClick={() => setSettingsSection(item.id)}
+                      >
+                        <item.icon size={26} />
+                        {item.label}
+                        <ChevronRight size={18} />
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+              <section
+                hidden={settingsSection !== "display"}
+                aria-label="Display settings"
+              >
+                <h2 className="setting-heading">Colour theme</h2>
+                <div className="themes">
+                  {[
+                    {
+                      id: "default",
+                      name: "Luma",
+                      colors: ["#5865F2", "#FF8A4C", "#2CCBA8"],
+                    },
+                    {
+                      id: "red-green",
+                      name: "Red–green friendly",
+                      colors: ["#0072B2", "#E69F00", "#17212F"],
+                    },
+                    {
+                      id: "blue-yellow",
+                      name: "Blue–yellow friendly",
+                      colors: ["#9B3658", "#254653", "#F0F0EB"],
+                    },
+                    {
+                      id: "contrast",
+                      name: "High contrast",
+                      colors: ["#000", "#FFF", "#FFD600"],
+                    },
+                  ].map((t) => (
+                    <button
+                      className={theme === t.id ? "chosen" : ""}
+                      key={t.id}
+                      aria-pressed={theme === t.id}
+                      onClick={() => setTheme(t.id)}
+                    >
+                      <span className="swatches">
+                        {t.colors.map((c) => (
+                          <i key={c} style={{ background: c }} />
+                        ))}
+                      </span>
+                      {t.name}
+                      {theme === t.id && <Check size={16} />}
+                    </button>
+                  ))}
+                </div>
+                <label className="setting-toggle">
+                  <span>
+                    <strong>Larger text</strong>
+                    <small>More room for every word</small>
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={large}
+                    onChange={(e) => setLarge(e.target.checked)}
+                  />
+                </label>
+              </section>
+              <section
+                hidden={settingsSection !== "voice"}
+                aria-label="Voice settings"
+              >
+                {" "}
+                <h2 className="setting-heading">Spoken directions</h2>
+                <label className="range-label" htmlFor="speech-rate">
+                  Speech speed <strong>{rate.toFixed(1)}×</strong>
+                </label>
+                <input
+                  id="speech-rate"
+                  className="range"
+                  type="range"
+                  min="0.6"
+                  max="2"
+                  step="0.1"
+                  value={rate}
+                  onChange={(e) => setRate(Number(e.target.value))}
+                />
+                <button
+                  className="secondary full"
+                  onClick={() =>
+                    speak(
+                      "This is a sample Luma instruction. Your next crossing is ahead.",
+                    )
+                  }
+                >
+                  <Volume2 size={22} />
+                  Test voice
+                </button>
+              </section>
+              <section
+                hidden={settingsSection !== "reader"}
+                aria-label="Screen reader settings"
+              >
+                {" "}
+                <label className="setting-toggle">
+                  <span>
+                    <strong>Screen reader announcements</strong>
+                    <small>Use announcements instead of the app voice</small>
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={screenReader}
+                    onChange={(e) => {
+                      setScreenReader(e.target.checked);
+                      window.speechSynthesis?.cancel();
+                    }}
+                  />
+                </label>
+              </section>
+              <section
+                hidden={settingsSection !== "crossings"}
+                aria-label="Crossing settings"
+              >
+                <h2 className="setting-heading">Crossings</h2>
+                <label className="setting-toggle">
+                  <span>Prefer audible crossings</span>
+                  <input
+                    type="checkbox"
+                    checked={audible}
+                    onChange={(e) => setAudible(e.target.checked)}
+                  />
+                </label>
+                <label className="setting-toggle">
+                  <span>Prefer fewer crossings</span>
+                  <input
+                    type="checkbox"
+                    checked={fewer}
+                    onChange={(e) => setFewer(e.target.checked)}
+                  />
+                </label>
+              </section>
+              <section
+                hidden={settingsSection !== "about"}
+                aria-label="About and data"
+              >
+                <div className="about-card">
+                  <img src="/brand/luma-symbol.png" alt="" />
+                  <h2>About Luma</h2>
+                  <p className="small">
+                    A hackathon route-planning prototype. Location data: City of
+                    Toronto, OpenStreetMap contributors / EmbedEarth (ODbL), TTC
+                    and cited providers.
+                  </p>
+                  <a
+                    href="https://www.openstreetmap.org/copyright"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    OpenStreetMap attribution <ExternalLink size={13} />
+                  </a>
+          <footer className="map-source-credit" aria-label="Map attribution">
+            Map:{" "}
+            <a href="https://openfreemap.org/" target="_blank" rel="noreferrer">
+              OpenFreeMap
+            </a>{" "}
+            · ©{" "}
+            <a
+              href="https://openmaptiles.org/"
+              target="_blank"
+              rel="noreferrer"
+            >
+              OpenMapTiles
+            </a>{" "}
+            · ©{" "}
+            <a
+              href="https://www.openstreetmap.org/copyright"
+              target="_blank"
+              rel="noreferrer"
+            >
+              OpenStreetMap contributors
+            </a>
+          </footer>
+                </div>
+              </section>
             </>
           )}
-          <footer className="map-source-credit" aria-label="Map attribution">
-            Map: <a href="https://openfreemap.org/" target="_blank" rel="noreferrer">OpenFreeMap</a> · © <a href="https://openmaptiles.org/" target="_blank" rel="noreferrer">OpenMapTiles</a> · © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap contributors</a>
-          </footer>
+
           {error && (
             <div className="error" role="alert">
               <span>{error}</span>
@@ -1121,40 +1301,59 @@ function App() {
           )}
         </section>
         {sim && route && (
-          <section className="simulation" aria-label="Simulated walk">
-            <div className="sim-top">
-              <span>
-                <span className="online-dot" />
-                SIMULATED WALK · {step + 1} OF {route.steps.length}
-              </span>
+          <section className="journey-mode" aria-label="Simulated walk">
+            <header className="journey-mode-header">
+              <img src="/brand/luma-symbol.png" alt="" />
+              <div>
+                <small>Previewing walk to</small>
+                <strong>{end.name}</strong>
+              </div>
+              <span className="preview-badge">Simulation</span>
               <button
                 className="icon-button"
                 aria-label="Close simulated walk"
-                onClick={() => {
-                  setSim(false);
-                  setPlaying(false);
-                  window.speechSynthesis?.cancel();
-                }}
+                onClick={endPreview}
               >
-                <X size={19} />
+                <X size={22} />
               </button>
-            </div>
-            <div className="sim-instruction">
-              <span className="direction-icon">
+            </header>
+            <div className="instruction-card">
+              <span className="instruction-symbol">
                 {route.steps[step].crossing ? (
-                  <Footprints size={28} />
+                  <Footprints size={36} />
                 ) : (
-                  <Navigation size={28} />
+                  <Navigation size={36} />
                 )}
               </span>
-              <div>
-                <small>{route.steps[step].distance} m along the path</small>
-                <h2>{route.steps[step].text}</h2>
-              </div>
+              <p>{route.steps[step].distance} metres along the path</p>
+              <h2 id="navigation-title" tabIndex={-1}>{route.steps[step].text.split('. ')[0].replace(/\.$/,'')}.</h2>
+              {route.steps[step].text.includes('. ') && <p className="instruction-context">{route.steps[step].text.slice(route.steps[step].text.indexOf('. ')+2)}</p>}
             </div>
-            <div className="sim-controls">
+            {route.steps[step + 1] && (
+              <div className="next-instruction">
+                <strong>Then</strong>
+                <p>{route.steps[step + 1].text.split('. ')[0].replace(/\.$/,'')}.</p>
+              </div>
+            )}
+            <div className="journey-progress">
+              <span>
+                {Math.max(
+                  0,
+                  Math.round(
+                    route.steps
+                      .slice(step)
+                      .reduce((n, s) => n + s.distance, 0) / 72,
+                  ),
+                )}{" "}
+                min of preview remaining
+              </span>
+              <span>
+                Step {step + 1} of {route.steps.length}
+              </span>
+            </div>
+            <div className="journey-controls">
               <button onClick={() => speak(route.steps[step].text)}>
-                <RotateCcw size={18} />
+                <RotateCcw size={26} />
                 Repeat
               </button>
               <button
@@ -1163,15 +1362,34 @@ function App() {
                   if (playing) window.speechSynthesis?.cancel();
                 }}
               >
-                {playing ? <Pause size={18} /> : <Play size={18} />}{" "}
+                {playing ? <Pause size={26} /> : <Play size={26} />}{" "}
                 {playing ? "Pause" : "Resume"}
               </button>
-              <button
-                disabled={step === route.steps.length - 1}
-                onClick={() => setStep((s) => s + 1)}
-              >
-                Next <ArrowRight size={18} />
+              <button className="where-button" onClick={simulatedLocation}>
+                <LocateFixed size={26} />
+                Where am I?
               </button>
+              <button className="end-button" onClick={endPreview}>
+                <X size={26} />
+                End
+              </button>
+            </div>
+            <button
+              className="secondary full next-step"
+              disabled={step === route.steps.length - 1}
+              onClick={() => {
+                setPlaying(false);
+                setStep((s) => s + 1);
+              }}
+            >
+              Next instruction <ArrowRight size={22} />
+            </button>
+            <div className="spoken-strip" aria-hidden="true">
+              <Volume2 size={21} />
+              <p>
+                <strong>Instruction</strong>
+                {notice || route.steps[step].text}
+              </p>
             </div>
           </section>
         )}
