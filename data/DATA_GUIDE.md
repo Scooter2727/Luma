@@ -65,3 +65,10 @@ Tactile snapshot attribution: © OpenStreetMap contributors, distributed by Embe
 `sources/extract_gtfs.py` extracts GTFS relationships and checks foreign keys. `sources/expand.mjs` compiles the master and supporting CSVs. They operate on retained snapshots; running them does not refresh sources. Recheck evidence and update snapshots before changing collection dates. These are data preparation scripts, not application implementation.
 
 CSVs use UTF-8 BOM, quoted fields and CRLF. Checks cover unique record IDs, source references, GTFS foreign keys, coordinate plausibility and output row counts. No field verification was performed.
+
+
+## Journey planner additions (November 7, 2026)
+
+`centreline.geojson` adds 51,499 street geometries from https://gis.toronto.ca/arcgis/rest/services/cot_geospatial/MapServer/2 (FEATURE_CODE < 204000, WGS84). `backend/fetch_street_names.py` reproduces the snapshot. This is City open data under the Open Government Licence - Toronto; it supplies inferred street names, not accessibility evidence. The walking planner uses the full retained Pednet network, maps APS by PX then a 45 m fallback, and associates tactile points within 8 m of crossing endpoints. These associations do not replace source evidence or field inspection.
+
+The planner now uses retained GTFS calendars, exceptions, trips, stop times and shapes for scheduled bus journeys with walk access/egress and at most one same-stop transfer. Generated SQLite indexes live under ignored `data/out/`. Route ETAs are estimates or scheduled times, not live arrivals. No new accessibility claims are inferred from generic bus stop coordinates. See the root README for cost parameters, connection limits and supported transit scope.
