@@ -12,6 +12,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import MapView from "./MapView";
+import Hero from "./Hero";
 import HomeView from "./HomeView";
 import { JourneyPlanner, RouteChoices } from "./JourneyPlanner";
 import { Onboarding, Settings } from "./Preferences";
@@ -91,6 +92,7 @@ export default function App() {
   const [onboarding, setOnboarding] = useState(
     () => !saved("onboarding-complete", false),
   );
+  const [showHero, setShowHero] = useState(true);
   const [view, setView] = useState<View>("home"),
     [data, setData] = useState<Feature[]>([]),
     [loaded, setLoaded] = useState(false),
@@ -438,15 +440,24 @@ export default function App() {
     : null;
   if (onboarding)
     return (
-      <div className="setup-shell">
-        <Onboarding {...prefProps} done={completeSetup} />
-        <div className="sr-only" role="status">
-          {notice}
+      <>
+        {showHero && (
+          <Hero theme={prefs.theme} onEnter={() => setShowHero(false)} />
+        )}
+        <div className="setup-shell">
+          <Onboarding {...prefProps} done={completeSetup} />
+          <div className="sr-only" role="status">
+            {notice}
+          </div>
         </div>
-      </div>
+      </>
     );
   return (
-    <div className={"app " + (view === "navigate" ? "navigating" : "")}>
+    <>
+      {showHero && (
+        <Hero theme={prefs.theme} onEnter={() => setShowHero(false)} />
+      )}
+      <div className={"app " + (view === "navigate" ? "navigating" : "")}>
       <a className="skip" href="#panel">
         Skip map to controls
       </a>
@@ -798,6 +809,7 @@ export default function App() {
       <div className="sr-only" role="status" aria-live="polite">
         {notice}
       </div>
-    </div>
+      </div>
+    </>
   );
 }
