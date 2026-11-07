@@ -214,26 +214,7 @@ function App() {
     if (!container.current) return;
     const m = new maplibregl.Map({
       container: container.current,
-      style: {
-        version: 8,
-        sources: {
-          carto: {
-            type: "raster",
-            tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
-            tileSize: 256,
-            attribution:
-              '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-          },
-        },
-        layers: [
-          {
-            id: "basemap",
-            type: "raster",
-            source: "carto",
-            paint: { "raster-saturation": -0.85, "raster-opacity": 0.85 },
-          },
-        ],
-      },
+      style: "/maps/simple.json",
       center: [-79.383, 43.652],
       zoom: 14.7,
       minZoom: 10,
@@ -258,7 +239,7 @@ function App() {
         data: { type: "FeatureCollection", features: [] },
         cluster: true,
         clusterMaxZoom: 13,
-        clusterRadius: 32,
+        clusterRadius: 50,
       });
       m.addLayer({
         id: "clusters",
@@ -271,6 +252,14 @@ function App() {
           "circle-stroke-color": "#fff",
           "circle-stroke-width": 3,
         },
+      });
+      m.addLayer({
+        id: "cluster-counts",
+        type: "symbol",
+        source: "locations",
+        filter: ["has", "point_count"],
+        layout: {"text-field": ["get", "point_count_abbreviated"], "text-font": ["Noto Sans Regular"], "text-size": 13},
+        paint: {"text-color": "#ffffff"},
       });
       m.addLayer({
         id: "points",
@@ -576,14 +565,6 @@ function App() {
             </button>
           ))}
         </div>
-        <div className="rail-bottom">
-          <span className="online-dot" />
-          <span>
-            Made for
-            <br />
-            your way.
-          </span>
-        </div>
       </aside>
       <main className="workspace">
         <section
@@ -592,12 +573,6 @@ function App() {
           aria-label="Toronto accessibility map"
         >
           <div ref={container} className="map" />
-          <div className="map-label">
-            <span className="online-dot" />
-            TORONTO, ON
-            <span className="map-label-sep" />
-            Explore with confidence
-          </div>
           <div className="map-actions">
             <button aria-label="Zoom in" onClick={() => map.current?.zoomIn()}>
               <Plus />
@@ -611,12 +586,6 @@ function App() {
             <button aria-label="Find my location" onClick={locate}>
               <LocateFixed />
             </button>
-          </div>
-          <div className="map-key">
-            <span className="key-dot" />
-            Audible crossing <span className="key-dot mint" />
-            Tactile paving <span className="key-dot orange" />
-            Transit
           </div>
           {mapError && (
             <div className="map-warning">
@@ -643,19 +612,7 @@ function App() {
           <div className="mobile-handle" />
           {view === "explore" && !selected && (
             <>
-              <div className="eyebrow">
-                <span /> A LITTLE MORE INDEPENDENCE
-              </div>
-              <h1>
-                Find your way.
-                <br />
-                <span>Your own way.</span>
-              </h1>
-              <p className="intro">
-                More accessible crossings. More familiar places.
-                <br className="desktop-break" /> A little confidence at every
-                turn.
-              </p>
+              <h1>Luma</h1>
               <div className="search-box">
                 <Search size={21} />
                 <input
@@ -706,7 +663,7 @@ function App() {
                     </button>
                   </div>
                   <div className="section-heading">
-                    <h2>Make the map yours</h2>
+                    <h2>Map features</h2>
                     <Layers size={17} />
                   </div>
                   <p className="muted small">
@@ -739,14 +696,10 @@ function App() {
                       <Footprints size={24} />
                     </div>
                     <div>
-                      <strong>
-                        A better crossing can
-                        <br />
-                        change your whole walk.
-                      </strong>
+                      <strong>Walking routes</strong>
                       <p>Find a route that favours audible signals.</p>
                       <button onClick={() => plan()}>
-                        Plan your first walk <ArrowRight size={16} />
+                        Plan a walk <ArrowRight size={16} />
                       </button>
                     </div>
                   </div>
@@ -754,7 +707,7 @@ function App() {
                     <h2>
                       {list
                         ? "Locations in this area"
-                        : "Around this part of town"}
+                        : "Nearby locations"}
                     </h2>
                     <button
                       className="text-button"
@@ -876,12 +829,7 @@ function App() {
           )}
           {view === "routes" && (
             <>
-              <div className="eyebrow">A WALK THAT WORKS FOR YOU</div>
-              <h1>
-                Take the
-                <br />
-                <span>better crossing.</span>
-              </h1>
+              <h1>Walking routes</h1>
               <div className="journey">
                 <label htmlFor="start">From</label>
                 <div className="journey-field">
@@ -1060,7 +1008,7 @@ function App() {
               {!routes.length && !busy && (
                 <div className="empty-route">
                   <RouteIcon size={32} />
-                  <h2>Your next walk starts here</h2>
+                  <h2>Choose a destination</h2>
                   <p>
                     Try Union Station to Nathan Phillips Square, or select a
                     destination from Explore.
@@ -1071,15 +1019,7 @@ function App() {
           )}
           {view === "settings" && (
             <>
-              <div className="eyebrow">MAKE YOURSELF AT HOME</div>
-              <h1>
-                Your walk.
-                <br />
-                <span>Your preferences.</span>
-              </h1>
-              <p className="intro">
-                Set things up the way that feels right for you.
-              </p>
+              <h1>Settings</h1>
               <h2 className="setting-heading">Colour theme</h2>
               <div className="themes">
                 {[
@@ -1163,7 +1103,7 @@ function App() {
                 className="secondary full"
                 onClick={() =>
                   speak(
-                    "Welcome to Luma. Your next crossing is ahead. Find your way, your own way.",
+                    "This is a sample Luma instruction. Your next crossing is ahead.",
                   )
                 }
               >
@@ -1172,11 +1112,7 @@ function App() {
               </button>
               <div className="about-card">
                 <img src="/brand/luma-symbol.png" alt="" />
-                <h2>A little more independence.</h2>
-                <p>
-                  Luma brings Toronto’s accessibility information together, so
-                  you can explore with more context.
-                </p>
+                <h2>About Luma</h2>
                 <p className="small">
                   A hackathon route-planning prototype. Location data: City of
                   Toronto, OpenStreetMap contributors / EmbedEarth (ODbL), TTC

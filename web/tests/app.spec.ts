@@ -8,7 +8,7 @@ test("desktop explore, preferences and real route preview", async ({
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto("/");
   await expect(
-    page.getByRole("heading", { name: "Find your way. Your own way." }),
+    page.getByRole("heading", { name: "Luma", exact: true }),
   ).toBeVisible();
   await expect(page.locator(".data-foot")).toContainText(
     "16,746 mapped locations",

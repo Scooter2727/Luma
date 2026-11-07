@@ -27,7 +27,8 @@ Open http://localhost:5173 . To view on a phone on the same Wi-Fi, use the Netwo
 ## Try it
 
 - Explore the map; zoom in to reveal individual category icons. Click a marker for its purpose and source.
-- Toggle map categories or use View list to browse locations without clicking the map.
+- All feature categories are enabled by default, including tactile paving, transit stops and libraries. Use filters to hide categories. Zoomed-out clusters show counts; the simplified background keeps street names while removing building and rail detail.
+- Use View list to browse locations without clicking the map.
 - Select Try a walk for Union Station → Nathan Phillips Square, or search for a destination.
 - Compare routes, read a summary aloud, and choose Preview walk for a clearly labelled step simulation.
 - Settings offers the requested Luma, red–green, blue–yellow and high-contrast palettes, speech speed, larger text and screen-reader announcements.
@@ -38,7 +39,7 @@ Location features come from `data/WAYFINDER_ALL_LOCATIONS.csv`; planned and relo
 
 Audible crossings are associated through matching source PX identifiers. As requested, listed signals are assumed operational for every crossing direction in the demo. Cost penalties prefer mapped audible crossings and/or fewer crossings. Missing sound information is not treated as confirmed absence. Tactile features are displayed; they do not yet influence routing. Exact entrances, individual buttons, per-crosswalk direction coverage, turn instructions, live traffic signal phases and reliable outdoor turn-by-turn guidance remain future work. Route steps are crossing previews with a mapped arrival point, not continuous live navigation. Distances from selected points to network endpoints are exposed.
 
-The map uses remote OpenStreetMap raster tiles and needs internet. Search uses collected local names and named demo destinations, not a full address geocoder. Browser speech availability depends on installed voices. If tiles cannot load, list/search remain usable. Theme changes affect the interface; map feature icons retain distinct pictograms and their category colours. No accounts or database required.
+The map uses a locally customized OpenFreeMap Positron vector style with remote OpenStreetMap-derived tiles and needs internet. Search uses collected local names and named demo destinations, not a full address geocoder. Browser speech availability depends on installed voices. If tiles cannot load, list/search remain usable. Theme changes affect the interface; map feature icons retain distinct pictograms and their category colours. No accounts or database required.
 
 ## Checks
 
@@ -52,4 +53,4 @@ Frontend tests need Playwright Chromium (`npx playwright install chromium`) and 
 
 ## Attribution
 
-Contains information licensed under the Open Government Licence – Toronto. Tactile snapshot © OpenStreetMap contributors, distributed by EmbedEarth under ODbL 1.0. Source links remain on location details. Basemap © OpenStreetMap contributors. Provider summaries retain links to their publishers. See `data/DATA_GUIDE.md` for collection provenance and assumptions.
+Contains information licensed under the Open Government Licence – Toronto. Tactile snapshot © OpenStreetMap contributors, distributed by EmbedEarth under ODbL 1.0. Source links remain on location details. Basemap: OpenFreeMap / OpenMapTiles, © OpenStreetMap contributors. Custom style in public/maps/simple.json derives from OpenFreeMap Positron. Provider summaries retain links to their publishers. See `data/DATA_GUIDE.md` for collection provenance and assumptions.

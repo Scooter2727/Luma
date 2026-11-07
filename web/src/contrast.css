@@ -1,4 +1,7 @@
 /* Keep the supplied brand blue for surfaces; deepen text on tinted surfaces. */
+.discovery-card p {
+  color: var(--ink);
+}
 :root {
   --readable-accent: #424ecc;
 }
