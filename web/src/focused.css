@@ -1,6 +1,9 @@
 /* Task-focused layouts based on the supplied transit mockups. */
+@media(min-width:761px){
+  .panel{bottom:auto;height:auto;max-height:calc(100dvh - 40px)}
+}
 .instruction-card .instruction-context{font-size:15px;font-weight:600;line-height:1.6;margin:16px 0 0}
-[data-theme="contrast"] .speed-card,[data-theme="contrast"] .spoken-strip{background:#161616;color:#fff}
+[data-theme="contrast"] .spoken-strip{background:#161616;color:#fff}
 @media(max-width:760px){.panel.settings-panel{top:0;border-radius:0}.settings-panel .mobile-handle{display:none}}
 [hidden]{display:none!important}
 .panel>h1,.panel>h1:first-of-type{font-size:32px;letter-spacing:-1px;margin:0 0 22px}
@@ -19,10 +22,10 @@
 .example-walk{font-size:16px;min-height:56px}.example-walk svg:last-child{margin-left:auto}
 .quick-actions{margin-top:5px;width:100%}.quick-actions button{font-size:16px;min-height:56px}.quick-actions button:first-child{background:#c8f4e8;color:#103c33;padding:0 16px;border-radius:12px;width:100%;justify-content:center;gap:10px}.quick-actions button:first-child svg{width:22px;height:22px}.quick-actions button:last-child{display:none}
 .nearby-details .section-heading{margin-top:0}.data-foot{margin-top:15px;font-size:11px}
-.speed-card{border-radius:20px;background:var(--ink);color:var(--surface);padding:19px;margin-bottom:20px}
+.speed-card{border-radius:20px;background:var(--tint);color:var(--ink);border:1px solid var(--line);padding:19px;margin-bottom:20px}
 .speed-card h2{font-size:20px}.speed-card>div{display:flex;align-items:center;justify-content:space-between;margin:17px 0}
-.speed-card>div>button{background:transparent;color:inherit;border:2px solid currentColor;border-radius:14px;width:65px;height:65px;display:grid;place-items:center}
-.speed-card>div>button:last-child{background:#2ccba8;color:#102a26;border-color:#2ccba8}.speed-card strong{font-size:38px;color:#2ccba8;font-weight:900}
+.speed-card>div>button{background:var(--surface);color:var(--readable-accent);border:2px solid var(--primary);border-radius:14px;width:65px;height:65px;display:grid;place-items:center}
+.speed-card>div>button:last-child{background:var(--primary);color:var(--primary-text);border-color:var(--primary)}.speed-card strong{font-size:38px;color:var(--readable-accent);font-weight:900}
 .speed-card .secondary{background:var(--surface);color:var(--ink);font-size:17px;min-height:55px;border-radius:12px}
 .settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .settings-grid button{display:flex;flex-wrap:wrap;align-items:center;gap:12px;text-align:left;font-size:17px;font-weight:900;padding:20px 14px;border:2px solid var(--ink);background:var(--surface);border-radius:16px;min-height:105px}
