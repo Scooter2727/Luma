@@ -441,11 +441,7 @@ export default function App() {
       <nav
         className="main-nav"
         aria-label="Main"
-        hidden={
-          view === "navigate" ||
-          view === "report" ||
-          (view === "routes" && showOptions)
-        }
+        hidden={view === "navigate" || (view === "routes" && showOptions)}
       >
         <a
           className="brand"
@@ -508,9 +504,7 @@ export default function App() {
           id="panel"
           className={
             "panel " +
-            (view === "report" || (view === "routes" && showOptions)
-              ? "focused-panel "
-              : "") +
+            (view === "routes" && showOptions ? "focused-panel " : "") +
             (view === "map" ? "map-panel" : "") +
             (view === "navigate" ? " navigation-panel" : "")
           }
@@ -658,7 +652,7 @@ export default function App() {
                   ? "Back to route"
                   : reportReturn === "map"
                     ? "Back to map"
-                    : "Back to home"
+                    : null
               }
               locate={getLocation}
               dictate={dictate}

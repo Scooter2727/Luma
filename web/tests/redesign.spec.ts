@@ -25,6 +25,56 @@ async function tryWalk(page: Page) {
   ).toBeVisible({ timeout: 65000 });
 }
 
+for (const viewport of [
+  { name: "phone", width: 390, height: 844 },
+  { name: "desktop", width: 1440, height: 1000 },
+]) {
+  test(`Report keeps navigation available on ${viewport.name}`, async ({
+    page,
+  }) => {
+    await boot(page, viewport.width, viewport.height);
+    const nav = page.getByRole("navigation", { name: "Main", exact: true });
+    await nav.getByRole("button", { name: "Report", exact: true }).click();
+    await expect(
+      page.getByRole("button", { name: "Back to home", exact: true }),
+    ).toHaveCount(0);
+    await expect(nav).toBeVisible();
+    await expect(
+      nav.getByRole("button", { name: "Report", exact: true }),
+    ).toHaveAttribute("aria-current", "page");
+    for (const tab of ["Home", "Routes", "Report", "Settings"])
+      await expect(
+        nav.getByRole("button", { name: tab, exact: true }),
+      ).toBeVisible();
+    await page
+      .getByRole("button", { name: "Signal silent", exact: true })
+      .click();
+    await expect(
+      page.getByRole("heading", { name: "Confirm report", exact: true }),
+    ).toBeVisible();
+    await page
+      .getByRole("button", { name: "Save report", exact: true })
+      .scrollIntoViewIfNeeded();
+    await expect(
+      page.getByRole("button", { name: "Back to home", exact: true }),
+    ).toHaveCount(0);
+    await expect(nav).toBeVisible();
+    if (viewport.name === "phone") {
+      const panel = await page.locator("#panel").boundingBox(),
+        bar = await nav.boundingBox();
+      expect(panel!.y + panel!.height).toBeLessThanOrEqual(bar!.y + 1);
+    }
+    await page.screenshot({
+      path: `artifacts/luma-report-navbar-${viewport.name}.png`,
+      fullPage: true,
+    });
+    await nav.getByRole("button", { name: "Settings", exact: true }).click();
+    await expect(
+      page.getByRole("heading", { name: "Settings", exact: true }),
+    ).toBeVisible();
+  });
+}
+
 test("hosted report saving is visibly disabled without creating records", async ({
   page,
 }) => {

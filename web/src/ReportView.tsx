@@ -42,7 +42,7 @@ export const issueTypes = [
 type Props = {
   initialLocation: LocatedPlace;
   back: () => void;
-  backLabel: string;
+  backLabel: string | null;
   locate: () => Promise<LocatedPlace>;
   dictate: (callback: (text: string) => void) => boolean;
   listening: boolean;
@@ -362,10 +362,12 @@ export default function ReportView({
           {error}
         </p>
       )}
-      <button className="dark-button back-to-route" onClick={back}>
-        <ArrowLeft />
-        {backLabel}
-      </button>
+      {backLabel && (
+        <button className="dark-button back-to-route" onClick={back}>
+          <ArrowLeft />
+          {backLabel}
+        </button>
+      )}
     </section>
   );
 }

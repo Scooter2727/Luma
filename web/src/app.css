@@ -1564,7 +1564,7 @@ h1:focus {
     font-size: 22px;
   }
   .report-screen {
-    min-height: calc(100dvh - 34px);
+    min-height: calc(100dvh - 126px - env(safe-area-inset-bottom));
   }
   .feature-card {
     max-width: 100%;
@@ -1580,6 +1580,25 @@ h1:focus {
   }
   .setup-actions {
     padding-top: 14px;
+  }
+}
+@media (hover: hover) and (pointer: fine) {
+  button:not(:disabled):hover,
+  .choice:hover {
+    background-image: linear-gradient(
+      var(--hover-shade, rgb(0 0 0 / 7%)),
+      var(--hover-shade, rgb(0 0 0 / 7%))
+    );
+  }
+  .dark-button,
+  .repeat-control,
+  .speed-controls > button:first-child,
+  [data-theme="contrast"] button,
+  [data-theme="contrast"] .choice {
+    --hover-shade: rgb(255 255 255 / 12%);
+  }
+  .choice {
+    cursor: pointer;
   }
 }
 @media (max-width: 360px) {
