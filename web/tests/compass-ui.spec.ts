@@ -512,3 +512,110 @@ test("compass shows magnetic heading without GPS and clears stale readings", asy
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
+
+test("Safari native heading works in Peterborough and approximate readings cannot confirm alignment", async ({
+  page,
+}) => {
+  await boot(page);
+  await page.evaluate(() =>
+    Object.defineProperty(DeviceOrientationEvent, "requestPermission", {
+      configurable: true,
+      value: () => Promise.resolve("granted"),
+    }),
+  );
+  await page
+    .getByRole("button", { name: "Open compass mode", exact: false })
+    .click();
+  await page.evaluate(() => {
+    (window as any).safariReading = {
+      beta: 80,
+      accuracy: 10,
+      longitude: -78.319,
+      latitude: 44.309,
+      heading: 90,
+    };
+    const update = () => {
+      const r = (window as any).safariReading;
+      (window as any).compassTest.callback?.({
+        timestamp: Date.now(),
+        coords: {
+          longitude: r.longitude,
+          latitude: r.latitude,
+          accuracy: 3,
+          heading: null,
+          speed: 0,
+        },
+      });
+      const event = new Event("deviceorientation");
+      Object.assign(event, {
+        absolute: false,
+        alpha: null,
+        beta: r.beta,
+        gamma: 2,
+        webkitCompassHeading: r.heading,
+        webkitCompassAccuracy: r.accuracy,
+      });
+      window.dispatchEvent(event);
+    };
+    update();
+    (window as any).safariTimer = setInterval(update, 100);
+  });
+  await expect(page.locator(".compass-reading strong")).not.toHaveText("—");
+  await expect(page.locator(".compass-face-status")).toContainText(
+    "Hold phone flatter",
+  );
+  await expect(
+    page.getByRole("img", { name: /Compass.*Approximate reading/ }),
+  ).toBeVisible();
+  await page.evaluate(() =>
+    Object.assign((window as any).safariReading, {
+      beta: 0,
+      accuracy: 45,
+      longitude: -79.38,
+      latitude: 43.65,
+      heading: 100,
+    }),
+  );
+  await expect(page.locator(".compass-face-status")).toContainText(
+    "accuracy is low",
+  );
+  await page.waitForTimeout(6000);
+  expect(
+    await page.evaluate(
+      () =>
+        (window as any).compassTest.vibrates.filter(
+          (p: number[]) => p.length === 1 && p[0] === 160,
+        ).length,
+    ),
+  ).toBe(0);
+  await page.evaluate(() => {
+    (window as any).safariReading.accuracy = 10;
+  });
+  await expect(page.locator(".compass-face-status")).toContainText(
+    "Direction aligned",
+    { timeout: 12000 },
+  );
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await page.evaluate(() => clearInterval((window as any).safariTimer));
+});
+
+test("denied Safari motion access explains what to allow on the minimal compass screen", async ({
+  page,
+}) => {
+  await boot(page);
+  await page.evaluate(() =>
+    Object.defineProperty(DeviceOrientationEvent, "requestPermission", {
+      configurable: true,
+      value: () => Promise.resolve("denied"),
+    }),
+  );
+  await page
+    .getByRole("button", { name: "Open compass mode", exact: false })
+    .click();
+  await expect(page.locator(".compass-face-status")).toContainText(
+    "Allow Motion and Orientation",
+  );
+  await expect(page.locator(".compass-reading strong")).toHaveText("—");
+  await expect(page.getByRole("dialog").getByRole("button")).toHaveCount(1);
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+});

@@ -46,6 +46,7 @@ export type CompassReading = {
   magnetic: number | null;
   time: number;
   reason: string;
+  guidanceReason?: string;
 };
 export function readCompass(
   e: CompassEvent,
@@ -57,32 +58,52 @@ export function readCompass(
     time,
     reason,
   });
-  if (
-    screenAngle !== 0 ||
+  const flat = !(
     e.beta === null ||
     e.gamma === null ||
     !Number.isFinite(e.beta) ||
     !Number.isFinite(e.gamma) ||
     Math.abs(e.beta) > 35 ||
     Math.abs(e.gamma) > 35
-  )
+  );
+  if (screenAngle !== 0)
     return invalid(
-      "Hold the phone flat in portrait, with its top pointing forward.",
+      "Rotate the phone to portrait, with its top pointing forward.",
     );
   if (e.webkitCompassHeading !== undefined) {
     if (
       !Number.isFinite(e.webkitCompassHeading) ||
       e.webkitCompassHeading < 0 ||
-      e.webkitCompassHeading >= 360 ||
-      !Number.isFinite(e.webkitCompassAccuracy) ||
-      e.webkitCompassAccuracy! < 0 ||
-      e.webkitCompassAccuracy! > 20
+      e.webkitCompassHeading >= 360
     )
+      return invalid(
+        "The iPhone compass has not supplied a valid heading yet. Move the phone gently.",
+      );
+    const accuracy = e.webkitCompassAccuracy;
+    if (Number.isFinite(accuracy) && accuracy! < 0)
       return invalid(
         "Compass calibration is unreliable. Move away from metal and check the phone’s compass calibration.",
       );
-    return { magnetic: e.webkitCompassHeading, time, reason: "" };
+    // Safari supplies its own heading. Tilt/unknown accuracy should pause route
+    // corrections, rather than throwing away the compass display entirely.
+    const guidanceReason = !Number.isFinite(accuracy)
+      ? "Compass accuracy is unavailable. Alignment feedback is paused."
+      : accuracy! > 20
+        ? "Compass accuracy is low. Move away from metal; alignment feedback is paused."
+        : !flat
+          ? "Hold the phone flatter for alignment feedback."
+          : undefined;
+    return {
+      magnetic: e.webkitCompassHeading,
+      time,
+      reason: "",
+      guidanceReason,
+    };
   }
+  if (!flat)
+    return invalid(
+      "Hold the phone flat in portrait, with its top pointing forward.",
+    );
   if (
     !e.absolute ||
     e.alpha === null ||
@@ -120,14 +141,16 @@ export async function requestCompassAccess(): Promise<string | null> {
   const C = window.DeviceOrientationEvent as typeof DeviceOrientationEvent & {
     requestPermission?: (absolute?: boolean) => Promise<string>;
   };
-  if (!window.isSecureContext || !C)
+  if (!window.isSecureContext)
+    return "Compass access needs HTTPS. Open the secure deployed Luma website.";
+  if (!C)
     return "This browser does not provide compass readings. Use the demo on desktop.";
   try {
     if (C.requestPermission && (await C.requestPermission(true)) !== "granted")
-      return "Compass permission was denied. You can try Find my direction again.";
+      return "Compass permission was denied. Go Back and reopen Compass to allow Motion and Orientation access.";
     return null;
   } catch {
-    return "Compass permission could not be obtained. Try Find my direction again.";
+    return "Compass permission could not be obtained. Go Back and reopen Compass to retry.";
   }
 }
 export async function watchCompass(
@@ -154,7 +177,7 @@ export async function watchCompass(
         magnetic: null,
         time: Date.now(),
         reason:
-          "An absolute compass heading is unavailable on this device. You can use the demo instead.",
+          "No compass readings arrived. Move the phone gently. If this continues, go Back and reopen Compass to allow Motion and Orientation access.",
       });
   }, 8000);
   window.addEventListener("deviceorientation", handler);

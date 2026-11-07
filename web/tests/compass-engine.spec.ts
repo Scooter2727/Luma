@@ -225,3 +225,44 @@ test("compass rejects relative, uncalibrated and tilted data and corrects magnet
   expect(trueHeading).toBeLessThan(82);
   expect(magneticToTrue(90, fix(), new Date("2031-01-01"))).toBeNull();
 });
+
+test("Safari native headings can display while tilt or uncertain accuracy pauses alignment", () => {
+  const native = {
+    absolute: false,
+    alpha: null,
+    beta: 80,
+    gamma: 2,
+    webkitCompassHeading: 90,
+    webkitCompassAccuracy: 10,
+  } as unknown as DeviceOrientationEvent;
+  const tilted = readCompass(native, 1000, 0);
+  expect(tilted.magnetic).toBe(90);
+  expect(tilted.reason).toBe("");
+  expect(tilted.guidanceReason).toContain("flatter");
+  const flat = { ...native, beta: 0 };
+  expect(
+    readCompass(flat as DeviceOrientationEvent, 1000, 0).guidanceReason,
+  ).toBeUndefined();
+  const uncertain = readCompass(
+    { ...flat, webkitCompassAccuracy: 45 } as DeviceOrientationEvent,
+    1000,
+    0,
+  );
+  expect(uncertain.magnetic).toBe(90);
+  expect(uncertain.guidanceReason).toContain("accuracy is low");
+  const noAccuracy = readCompass(
+    { ...flat, webkitCompassAccuracy: undefined } as DeviceOrientationEvent,
+    1000,
+    0,
+  );
+  expect(noAccuracy.magnetic).toBe(90);
+  expect(noAccuracy.guidanceReason).toContain("accuracy is unavailable");
+  expect(
+    readCompass(
+      { ...flat, webkitCompassAccuracy: -1 } as DeviceOrientationEvent,
+      1000,
+      0,
+    ).magnetic,
+  ).toBeNull();
+  expect(readCompass(native, 1000, 90).reason).toContain("Rotate");
+});

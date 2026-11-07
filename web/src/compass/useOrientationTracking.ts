@@ -64,6 +64,7 @@ export function useOrientationTracking({
   const [expected, setExpected] = useState<number | null>(null);
   const [compassHeading, setCompassHeading] = useState<number | null>(null);
   const [compassReason, setCompassReason] = useState("");
+  const [compassWarning, setCompassWarning] = useState("");
   const [northReference, setNorthReference] = useState<
     "true" | "magnetic" | null
   >(null);
@@ -92,6 +93,7 @@ export function useOrientationTracking({
     setExpected(null);
     setCompassHeading(null);
     setCompassReason("");
+    setCompassWarning("");
     setNorthReference(null);
     setResult(empty);
     generation.current++;
@@ -188,6 +190,7 @@ export function useOrientationTracking({
         gps = sensor.fix;
       const rawCompass = sensor.compass;
       setCompassReason(rawCompass?.reason || "");
+      setCompassWarning(rawCompass?.guidanceReason || "");
       // The compass face can show magnetic north without a route/GPS fix.
       // Route corrections below still require all location and confidence checks.
       if (
@@ -248,6 +251,7 @@ export function useOrientationTracking({
         if (!reason && find) {
           const compass = sensor.compass;
           if (compass?.reason) reason = compass.reason;
+          else if (compass?.guidanceReason) reason = compass.guidanceReason;
           else if (
             !compass ||
             now - compass.time > 3000 ||
@@ -320,6 +324,7 @@ export function useOrientationTracking({
     expected,
     compassHeading,
     compassReason,
+    compassWarning,
     northReference,
     fix,
     offRoute,

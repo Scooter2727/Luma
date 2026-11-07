@@ -19,6 +19,19 @@ const live = {
   reliableCompass: true,
 };
 const directions = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+function sensorMessage(reason: string) {
+  if (reason.includes("HTTPS")) return "Open Luma over HTTPS";
+  if (reason.includes("permission")) return "Allow Motion and Orientation";
+  if (reason.includes("Rotate")) return "Rotate phone to portrait";
+  if (reason.includes("Hold the phone")) return "Hold phone flatter";
+  if (reason.includes("calibration")) return "Compass needs calibration";
+  if (reason.includes("No compass readings"))
+    return "Move phone gently to start compass";
+  if (reason.includes("accuracy is unavailable"))
+    return "Compass accuracy unavailable";
+  if (reason.includes("accuracy")) return "Compass accuracy is low";
+  return "Compass unavailable";
+}
 export default function CompassMode({
   route,
   entry,
@@ -37,6 +50,7 @@ export default function CompassMode({
     result,
     compassHeading,
     compassReason,
+    compassWarning,
     northReference,
     requestCompass,
     hapticsAvailable,
@@ -61,7 +75,7 @@ export default function CompassMode({
   const accessibleText =
     heading === null
       ? "Compass heading unavailable. " + (compassReason || result.reason)
-      : `Compass. ${heading} degrees ${direction}. ${northReference === "true" ? "True north" : "Magnetic north"}.`;
+      : `Compass. ${heading} degrees ${direction}. ${northReference === "true" ? "True north" : "Magnetic north"}.${compassWarning ? " Approximate reading. " + compassWarning : ""}`;
   return createPortal(
     <section
       className="compass-fullscreen"
@@ -160,15 +174,17 @@ export default function CompassMode({
         >
           {heading === null
             ? compassReason
-              ? "Compass unavailable"
+              ? sensorMessage(compassReason)
               : "Waiting for compass"
-            : result.state === "UNCERTAIN"
-              ? northReference === "true"
-                ? "True north"
-                : "Magnetic north"
-              : labels[result.state]}
+            : compassWarning
+              ? sensorMessage(compassWarning)
+              : result.state === "UNCERTAIN"
+                ? northReference === "true"
+                  ? "True north"
+                  : "Magnetic north"
+                : labels[result.state]}
           <span className="sr-only">
-            . {compassReason || result.reason}
+            . {compassReason || compassWarning || result.reason}
             {!hapticsAvailable ? " Vibration unavailable in this browser." : ""}
           </span>
         </p>
