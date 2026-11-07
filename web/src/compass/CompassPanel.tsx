@@ -44,17 +44,24 @@ export default function CompassPanel({
     speed: 1.2,
     reliableCompass: true,
   });
-  const { result, fix, offRoute, vibration, requestCompass, testVibration } =
-    useOrientationTracking({
-      route,
-      enabled,
-      pointing,
-      simulation,
-      haptics,
-      voice: voice && !screenReader,
-      config,
-      speak,
-    });
+  const {
+    result,
+    fix,
+    offRoute,
+    vibration,
+    hapticsAvailable,
+    requestCompass,
+    testVibration,
+  } = useOrientationTracking({
+    route,
+    enabled,
+    pointing,
+    simulation,
+    haptics,
+    voice: voice && !screenReader,
+    config,
+    speak,
+  });
   const uncertain = result.state === "UNCERTAIN";
   const StatusIcon = uncertain
     ? HelpCircle
@@ -98,7 +105,7 @@ export default function CompassPanel({
   return (
     <section className="compass-panel" aria-labelledby="compass-title">
       <div className="compass-heading">
-        <h2 id="compass-title">
+        <h2 id="compass-title" tabIndex={-1}>
           <Compass aria-hidden="true" size={30} /> Luma Compass
         </h2>
         <button
@@ -127,6 +134,12 @@ export default function CompassPanel({
               ? "DEMO · simulated readings"
               : "LIVE SENSORS · route preview is paused"}
           </p>
+          {!hapticsAvailable && (
+            <p className="compass-feedback-note">
+              Vibration unavailable in this browser. Use voice or screen-reader
+              feedback.
+            </p>
+          )}
           <div
             className="compass-status"
             role="status"
@@ -208,7 +221,9 @@ export default function CompassPanel({
             <label>
               <input
                 type="checkbox"
-                checked={haptics}
+                checked={hapticsAvailable && haptics}
+                disabled={!hapticsAvailable}
+                aria-describedby="compass-vibration-status"
                 onChange={(e) => {
                   setHaptics(e.target.checked);
                   localStorage.setItem(
@@ -219,8 +234,12 @@ export default function CompassPanel({
               />
               Vibration feedback
             </label>
-            <p>{vibration}</p>
-            <button className="outline-button" onClick={testVibration}>
+            <p id="compass-vibration-status">{vibration}</p>
+            <button
+              className="outline-button"
+              onClick={testVibration}
+              disabled={!hapticsAvailable}
+            >
               Test vibration
             </button>
             <p>

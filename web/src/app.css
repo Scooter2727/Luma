@@ -1167,21 +1167,131 @@ h1:focus {
   background: var(--primary);
   color: var(--primary-text);
   min-height: 112px;
+  width: 100%;
+  text-align: left;
 }
 .navigation-instruction > svg {
   color: var(--accent);
+  flex-shrink: 0;
 }
 .navigation-instruction strong {
   font-size: 28px;
   line-height: 1.1;
   display: block;
 }
-.navigation-instruction p {
+.navigation-instruction .instruction-summary {
+  display: block;
   font-size: 22px;
   font-weight: 700;
   line-height: 1.15;
   margin-top: 5px;
   overflow-wrap: anywhere;
+}
+.instruction-action {
+  display: block;
+  margin-top: 8px;
+  font-size: 17px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.compass-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: var(--surface);
+  color: var(--ink);
+}
+.compass-back.outline-button {
+  position: absolute;
+  z-index: 1;
+  top: max(20px, env(safe-area-inset-top));
+  left: max(20px, env(safe-area-inset-left));
+  min-height: 60px;
+  min-width: 120px;
+  width: auto;
+  padding: 12px 18px;
+  font-size: 24px;
+  margin: 0;
+}
+.compass-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  pointer-events: none;
+}
+.compass-face {
+  width: min(82vw, 62dvh, 460px);
+  aspect-ratio: 1;
+  position: relative;
+}
+.compass-face svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.compass-rim {
+  fill: var(--surface);
+  stroke: var(--ink);
+  stroke-width: 4;
+}
+.compass-tick {
+  stroke: var(--ink);
+  stroke-width: 2;
+}
+.compass-tick.major {
+  stroke-width: 4;
+}
+.compass-cardinal {
+  fill: var(--ink);
+  font-size: 30px;
+  font-weight: 700;
+}
+.compass-cardinal.north {
+  fill: var(--readable-accent);
+}
+.compass-needle-north,
+.compass-phone-marker {
+  fill: var(--readable-accent);
+}
+.compass-needle-south {
+  fill: var(--surface);
+  stroke: var(--ink);
+  stroke-width: 2;
+}
+.compass-reading {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  justify-items: center;
+  background: var(--surface);
+  border-radius: 50%;
+  padding: 6px;
+}
+.compass-reading strong {
+  font-size: clamp(30px, 8vw, 52px);
+  line-height: 1.05;
+}
+.compass-reading span {
+  font-size: clamp(18px, 5vw, 26px);
+}
+.compass-face-status {
+  position: absolute;
+  top: calc(50% + min(41vw, 31dvh, 230px) + 24px);
+  margin: 0;
+  text-align: center;
+  font-size: 22px;
+  max-width: calc(100% - 32px);
+}
+.compass-feedback-note {
+  padding: 12px;
+  border: 2px solid var(--ink);
+  border-radius: 12px;
+  background: var(--tint);
+  font-weight: 700;
 }
 .navigation-controls {
   display: grid;
@@ -1700,7 +1810,7 @@ h1:focus {
   .navigation-instruction strong {
     font-size: 28px;
   }
-  .navigation-instruction p {
+  .navigation-instruction .instruction-summary {
     font-size: 22px;
   }
   .report-screen {

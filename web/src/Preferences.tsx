@@ -14,6 +14,7 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 import { CrosswalkIcon } from "./Icons";
+import { logoForTheme } from "./brand";
 import type { Preferences } from "./model";
 export type PreferenceProps = {
   prefs: Preferences;
@@ -241,7 +242,7 @@ export function Onboarding(props: PreferenceProps & { done: () => void }) {
   return (
     <section className="onboarding" aria-label="Set up Luma">
       <header className="setup-header">
-        <img src="/brand/luma-symbol.png" alt="" />
+        <img src={logoForTheme(prefs.theme)} alt="" />
         <strong>Step {step} of 5</strong>
         <button className="text-action" onClick={done}>
           Skip setup
@@ -385,7 +386,7 @@ export function Settings(
         </header>
       ) : (
         <header className="page-header">
-          <img src="/brand/luma-symbol.png" alt="" />
+          <img src={logoForTheme(props.prefs.theme)} alt="" />
           <h1>Settings</h1>
         </header>
       )}

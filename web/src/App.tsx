@@ -16,6 +16,7 @@ import HomeView from "./HomeView";
 import { JourneyPlanner, RouteChoices } from "./JourneyPlanner";
 import { Onboarding, Settings } from "./Preferences";
 import NavigationView from "./NavigationView";
+import { logoForTheme } from "./brand";
 import ReportView, { ReportHistory } from "./ReportView";
 import type { LocatedPlace } from "./ReportView";
 import {
@@ -159,6 +160,11 @@ export default function App() {
     document.documentElement.dataset.theme = prefs.theme;
     document.documentElement.classList.toggle("large-text", prefs.large);
     localStorage.setItem("luma-theme", prefs.theme);
+    const favicon = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+    if (favicon) {
+      favicon.type = "image/svg+xml";
+      favicon.href = logoForTheme(prefs.theme);
+    }
     for (const [key, value] of Object.entries({
       "audible-v2": prefs.audible,
       "fewer-v2": prefs.fewer,
@@ -458,7 +464,7 @@ export default function App() {
             go("home");
           }}
         >
-          <img src="/brand/luma-symbol.png" alt="" />
+          <img src={logoForTheme(prefs.theme)} alt="" />
           <span>Luma</span>
         </a>
         {(
@@ -525,6 +531,7 @@ export default function App() {
         >
           {view === "home" && (
             <HomeView
+              theme={prefs.theme}
               end={end}
               lastTrip={lastTrip}
               example={initialEnd}

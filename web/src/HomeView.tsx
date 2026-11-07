@@ -10,8 +10,10 @@ import {
   ArrowRight,
 } from "lucide-react";
 import PlacePicker from "./PlacePicker";
+import { logoForTheme } from "./brand";
 import type { Place } from "./model";
 type Props = {
+  theme: string;
   end: Place;
   lastTrip: Place | null;
   example: Place;
@@ -31,7 +33,7 @@ export default function HomeView(p: Props) {
   return (
     <>
       <header className="page-header">
-        <img src="/brand/luma-symbol.png" alt="" />
+        <img src={logoForTheme(p.theme)} alt="" />
         <h1 tabIndex={-1}>Where to?</h1>
         <button
           className="icon-button header-map"

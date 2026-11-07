@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import CompassPanel from "./compass/CompassPanel";
+import CompassMode from "./compass/CompassMode";
+import { requestCompassAccess } from "./compass/sensors";
 import {
   ArrowRight,
   Navigation,
@@ -15,7 +17,7 @@ import {
 } from "lucide-react";
 import { SignalIcon } from "./Icons";
 import type { Coord, Preferences, Route } from "./model";
-import { instructionText, timeLabel } from "./model";
+import { instructionText, saved, timeLabel } from "./model";
 type Props = {
   route: Route;
   step: number;
@@ -47,12 +49,49 @@ export default function NavigationView({
   reroute,
 }: Props) {
   const [compassActive, setCompassActive] = useState(false);
+  const [compassEntry, setCompassEntry] = useState<{
+    permission: Promise<string | null>;
+  } | null>(null);
+  const directionCard = useRef<HTMLButtonElement>(null);
   const s = route.steps[step],
     upcoming = route.steps[step + 1];
   const text = instructionText(s, route.steps[step - 1], prefs.directions);
   const summary =
     prefs.directions === "left-right" ? s.title : text.split(". ")[0];
   const isBus = ["wait", "board", "ride", "alight"].includes(s.kind);
+  const distanceLabel = s.scheduled_time
+    ? timeLabel(s.scheduled_time) + " scheduled"
+    : s.distance > 0
+      ? s.distance + " m"
+      : s.kind === "arrive"
+        ? "Arrival"
+        : "Next instruction";
+  function openCompass() {
+    // iOS motion permission must originate in this tap, not a mount effect.
+    const permission = requestCompassAccess();
+    pausePreview();
+    if (saved("compass-voice", true))
+      speak(
+        "Compass mode. Stop somewhere safe. Hold your phone flat in portrait, with the top pointing forward.",
+      );
+    setCompassEntry({ permission });
+  }
+  function closeCompass() {
+    setCompassEntry(null);
+    setCompassActive(false);
+    window.speechSynthesis?.cancel();
+    window.requestAnimationFrame(() => directionCard.current?.focus());
+  }
+  if (compassEntry)
+    return (
+      <CompassMode
+        route={route}
+        screenReader={prefs.screenReader}
+        speak={speak}
+        entry={compassEntry}
+        back={closeCompass}
+      />
+    );
   return (
     <section
       className={"navigation-screen " + (s.crossing ? "crossing-screen" : "")}
@@ -117,7 +156,11 @@ export default function NavigationView({
         </>
       ) : (
         <>
-          <div className="navigation-instruction">
+          <button
+            className="navigation-instruction"
+            ref={directionCard}
+            onClick={openCompass}
+          >
             {isBus ? (
               <Bus size={56} />
             ) : s.title.toLowerCase().includes("right") ? (
@@ -125,19 +168,12 @@ export default function NavigationView({
             ) : (
               <Navigation size={56} />
             )}
-            <div>
-              <strong>
-                {s.scheduled_time
-                  ? timeLabel(s.scheduled_time) + " scheduled"
-                  : s.distance > 0
-                    ? s.distance + " m"
-                    : s.kind === "arrive"
-                      ? "Arrival"
-                      : "Next instruction"}
-              </strong>
-              <p>{summary}</p>
-            </div>
-          </div>
+            <span>
+              <strong>{distanceLabel}</strong>
+              <span className="instruction-summary">{summary}</span>
+              <span className="instruction-action">Open compass mode</span>
+            </span>
+          </button>
           <div
             className="navigation-controls"
             role="group"

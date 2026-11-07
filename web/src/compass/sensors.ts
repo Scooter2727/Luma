@@ -114,20 +114,28 @@ export function magneticToTrue(
     return null;
   }
 }
-export async function watchCompass(
-  onReading: (reading: CompassReading) => void,
-): Promise<() => void> {
+// Call during the opening tap, before rendering/mounting the Compass screen.
+// Resolve errors as text so a pending system prompt cannot reject unhandled.
+export async function requestCompassAccess(): Promise<string | null> {
   const C = window.DeviceOrientationEvent as typeof DeviceOrientationEvent & {
     requestPermission?: (absolute?: boolean) => Promise<string>;
   };
   if (!window.isSecureContext || !C)
-    throw Error(
-      "This browser does not provide compass readings. Use the demo on desktop.",
-    );
-  if (C.requestPermission && (await C.requestPermission(true)) !== "granted")
-    throw Error(
-      "Compass permission was denied. You can try Find my direction again.",
-    );
+    return "This browser does not provide compass readings. Use the demo on desktop.";
+  try {
+    if (C.requestPermission && (await C.requestPermission(true)) !== "granted")
+      return "Compass permission was denied. You can try Find my direction again.";
+    return null;
+  } catch {
+    return "Compass permission could not be obtained. Try Find my direction again.";
+  }
+}
+export async function watchCompass(
+  onReading: (reading: CompassReading) => void,
+  permission: Promise<string | null> = requestCompassAccess(),
+): Promise<() => void> {
+  const error = await permission;
+  if (error) throw Error(error);
   let received = false;
   const handler = (event: DeviceOrientationEvent) => {
     if (

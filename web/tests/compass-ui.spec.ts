@@ -75,6 +75,7 @@ async function boot(page: Page, width = 390) {
       },
     });
     Object.defineProperty(navigator, "vibrate", {
+      configurable: true,
       value: (pattern: number[] | number) => {
         state.vibrates.push(Array.isArray(pattern) ? pattern : [pattern]);
         return true;
@@ -341,4 +342,173 @@ test("sustained off-route locations can recalculate using the existing planner",
     page.getByRole("button", { name: "Preview route 1", exact: true }),
   ).toBeVisible();
   expect(await page.evaluate(() => (window as any).compassTest.clears)).toBe(1);
+});
+
+for (const width of [320, 390, 1440])
+  test(`direction card opens Compass mode with sensor permission from the tap at ${width}px`, async ({
+    page,
+  }) => {
+    await boot(page, width);
+    await page.evaluate(() => {
+      Object.defineProperty(DeviceOrientationEvent, "requestPermission", {
+        configurable: true,
+        value: () => {
+          (window as any).compassTest.permissionInGesture =
+            navigator.userActivation.isActive;
+          return Promise.resolve("granted");
+        },
+      });
+    });
+    const card = page.getByRole("button", {
+      name: /320 m.*Continue along Front Street.*Open compass mode/,
+    });
+    const step = await page.locator(".preview-badge").innerText();
+    if (width === 1440) {
+      await card.focus();
+      await card.press("Enter");
+    } else await card.click();
+    await expect(
+      page.getByRole("dialog", { name: "Compass mode", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Back", exact: true }),
+    ).toBeFocused();
+    expect(
+      await page.evaluate(
+        () => (window as any).compassTest.permissionInGesture,
+      ),
+    ).toBe(true);
+    expect(await page.evaluate(() => (window as any).compassTest.watches)).toBe(
+      1,
+    );
+    await expect(page.getByRole("dialog").getByRole("button")).toHaveCount(1);
+    const face = await page.locator(".compass-face").boundingBox();
+    expect(Math.abs(face!.x + face!.width / 2 - width / 2)).toBeLessThan(2);
+    expect(Math.abs(face!.y + face!.height / 2 - 450)).toBeLessThan(2);
+    await expect(
+      page.getByRole("group", { name: "Navigation controls", exact: true }),
+    ).toHaveCount(0);
+    await page.evaluate(() => {
+      const gps = () =>
+        (window as any).compassTest.callback?.({
+          timestamp: Date.now(),
+          coords: {
+            longitude: -79.38,
+            latitude: 43.65,
+            accuracy: 3,
+            heading: null,
+            speed: 0,
+          },
+        });
+      gps();
+      (window as any).gpsTimer = setInterval(gps, 1000);
+      (window as any).headingTimer = setInterval(
+        () =>
+          window.dispatchEvent(
+            new DeviceOrientationEvent("deviceorientationabsolute", {
+              absolute: true,
+              alpha: 260,
+              beta: 0,
+              gamma: 0,
+            }),
+          ),
+        100,
+      );
+    });
+    await expect(page.locator(".compass-face-status")).toContainText(
+      "Direction aligned",
+      { timeout: 12000 },
+    );
+    await expect(page.locator(".compass-reading strong")).toHaveText("90°");
+    await page.keyboard.press("Tab");
+    await expect(
+      page.getByRole("button", { name: "Back", exact: true }),
+    ).toBeFocused();
+    await audit(page);
+    await page.screenshot({
+      path: `artifacts/luma-compass-entry-${width}.png`,
+    });
+    await page.getByRole("button", { name: "Back", exact: true }).click();
+    expect(await page.evaluate(() => (window as any).compassTest.clears)).toBe(
+      1,
+    );
+    await expect(card).toBeFocused();
+    await expect(page.locator(".preview-badge")).toHaveText(step);
+    await expect(
+      page.getByRole("button", { name: "Play preview", exact: true }),
+    ).toBeEnabled();
+  });
+
+test("without a vibration API Compass keeps its simple face and settings explain availability", async ({
+  page,
+}) => {
+  await boot(page);
+  await page.evaluate(() =>
+    Object.defineProperty(navigator, "vibrate", {
+      value: undefined,
+      configurable: true,
+    }),
+  );
+  await page
+    .getByRole("button", { name: "Open compass mode", exact: false })
+    .click();
+  await expect(page.getByRole("dialog").getByRole("button")).toHaveCount(1);
+  await expect(page.locator(".compass-face-status")).toContainText(
+    "Vibration unavailable",
+  );
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  expect(await page.evaluate(() => (window as any).compassTest.clears)).toBe(1);
+  await page
+    .getByRole("button", { name: "Try compass demo", exact: true })
+    .click();
+  await page.getByText("Compass options", { exact: true }).click();
+  await expect(
+    page.getByRole("checkbox", { name: "Vibration feedback", exact: true }),
+  ).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: "Test vibration", exact: true }),
+  ).toBeDisabled();
+  await audit(page);
+});
+
+test("compass shows magnetic heading without GPS and clears stale readings", async ({
+  page,
+}) => {
+  await boot(page);
+  await page.evaluate(() =>
+    Object.defineProperty(DeviceOrientationEvent, "requestPermission", {
+      configurable: true,
+      value: () => Promise.resolve("granted"),
+    }),
+  );
+  await page
+    .getByRole("button", { name: "Open compass mode", exact: false })
+    .click();
+  await page.evaluate(() => {
+    (window as any).headingTimer = setInterval(
+      () =>
+        window.dispatchEvent(
+          new DeviceOrientationEvent("deviceorientationabsolute", {
+            absolute: true,
+            alpha: 270,
+            beta: 0,
+            gamma: 0,
+          }),
+        ),
+      100,
+    );
+  });
+  await expect(
+    page.getByRole("img", {
+      name: "Compass. 90 degrees E. Magnetic north.",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(page.locator(".compass-reading strong")).toHaveText("90°");
+  await page.evaluate(() => clearInterval((window as any).headingTimer));
+  await expect(page.locator(".compass-reading strong")).toHaveText("—", {
+    timeout: 7000,
+  });
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
 });

@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import type { Route } from "../model";
 import {
   defaults,
+  angleDifference,
+  normalize,
   freshFix,
   matchRoute,
   movementCourse,
@@ -60,11 +62,17 @@ export function useOrientationTracking({
   const [result, setResult] = useState(empty);
   const [fix, setFix] = useState<Fix | null>(null);
   const [expected, setExpected] = useState<number | null>(null);
+  const [compassHeading, setCompassHeading] = useState<number | null>(null);
+  const [compassReason, setCompassReason] = useState("");
+  const [northReference, setNorthReference] = useState<
+    "true" | "magnetic" | null
+  >(null);
   const [offRoute, setOffRoute] = useState(false);
+  const hapticsAvailable = typeof navigator.vibrate === "function";
   const [vibration, setVibration] = useState(
-    typeof navigator.vibrate === "function"
+    hapticsAvailable
       ? "Vibration available; test it on your device."
-      : "Vibration is unavailable in this browser. Text and voice feedback still work.",
+      : "Vibration is unavailable in this browser. Use spoken feedback or your screen reader instead.",
   );
   const readings = useRef<{
     fix: Fix | null;
@@ -82,6 +90,9 @@ export function useOrientationTracking({
     setFix(null);
     setOffRoute(false);
     setExpected(null);
+    setCompassHeading(null);
+    setCompassReason("");
+    setNorthReference(null);
     setResult(empty);
     generation.current++;
     sensorCleanup.current?.();
@@ -137,7 +148,7 @@ export function useOrientationTracking({
     };
   }, [enabled, simulation.enabled, route]);
 
-  async function requestCompass() {
+  async function requestCompass(permission?: Promise<string | null>) {
     const epoch = ++generation.current;
     sensorCleanup.current?.();
     sensorCleanup.current = null;
@@ -146,7 +157,7 @@ export function useOrientationTracking({
       const cleanup = await watchCompass((reading) => {
         if (epoch === generation.current && !document.hidden)
           readings.current.compass = reading;
-      });
+      }, permission);
       if (epoch !== generation.current) cleanup();
       else sensorCleanup.current = cleanup;
     } catch (error) {
@@ -175,6 +186,35 @@ export function useOrientationTracking({
         { simulation: sim, pointing: find } = latest.current;
       const sensor = readings.current,
         gps = sensor.fix;
+      const rawCompass = sensor.compass;
+      setCompassReason(rawCompass?.reason || "");
+      // The compass face can show magnetic north without a route/GPS fix.
+      // Route corrections below still require all location and confidence checks.
+      if (
+        !sim.enabled &&
+        !document.hidden &&
+        rawCompass &&
+        !rawCompass.reason &&
+        rawCompass.magnetic !== null &&
+        now - rawCompass.time <= 3000
+      ) {
+        const corrected =
+          gps && freshFix(gps, now)
+            ? magneticToTrue(rawCompass.magnetic, gps, new Date(now))
+            : null;
+        const faceHeading = corrected ?? rawCompass.magnetic;
+        setCompassHeading((previous) =>
+          previous === null
+            ? faceHeading
+            : normalize(
+                previous + angleDifference(faceHeading, previous) * 0.35,
+              ),
+        );
+        setNorthReference(corrected === null ? "magnetic" : "true");
+      } else {
+        setCompassHeading(null);
+        setNorthReference(null);
+      }
       let target: number | null = null,
         heading: number | null = null,
         reason = "",
@@ -246,7 +286,11 @@ export function useOrientationTracking({
       setResult(next);
       if (next.feedback && !document.hidden) {
         const options = latest.current;
-        if (options.haptics && !vibrate(patterns[next.feedback]))
+        if (
+          options.haptics &&
+          hapticsAvailable &&
+          !vibrate(patterns[next.feedback])
+        )
           setVibration(
             "Vibration could not play. Text and voice feedback still work.",
           );
@@ -274,9 +318,13 @@ export function useOrientationTracking({
   return {
     result,
     expected,
+    compassHeading,
+    compassReason,
+    northReference,
     fix,
     offRoute,
     vibration,
+    hapticsAvailable,
     requestCompass,
     testVibration: () => {
       setVibration(
