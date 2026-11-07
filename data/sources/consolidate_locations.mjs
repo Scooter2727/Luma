@@ -1,0 +1,11 @@
+import fs from 'node:fs/promises';
+import {createRequire} from 'node:module';
+import {pathToFileURL} from 'node:url';
+const require=createRequire('C:/Users/scott/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/package.json');
+const {Workbook}=await import(pathToFileURL(require.resolve('@oai/artifact-tool')).href);
+const matrix=JSON.parse(await fs.readFile('data/sources/consolidated-matrix.json','utf8'));
+const wb=Workbook.create();const sh=wb.worksheets.add('All locations');
+sh.getRange('A1').write(matrix);
+const quote=v=>'"'+String(v??'').replaceAll('"','""')+'"';
+await fs.writeFile('data/WAYFINDER_ALL_LOCATIONS.csv','\ufeff'+matrix.map(r=>r.map(quote).join(',')).join('\r\n')+'\r\n');
+console.log('Saved '+(matrix.length-1)+' rows to WAYFINDER_ALL_LOCATIONS.csv');

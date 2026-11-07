@@ -1,0 +1,2 @@
+﻿"notice_id","location_id","purpose","description","source_id","checked_date","expires_at","status"
+"richview-doors","tpl-RI","Flag an entrance assistance issue","Branch page says entrance-door accessibility function is unavailable until further notice.","richview-alert","2026-11-07","","requires_live_recheck"

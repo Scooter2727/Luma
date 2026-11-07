@@ -1,0 +1,10 @@
+{
+  "profile": "hackathon_demo",
+  "created_date": "2026-11-07",
+  "source_data_accepted_as_correct": true,
+  "listed_existing_features_assumed_operational": true,
+  "aps_coverage": "all_crossing_directions_at_each_listed_intersection",
+  "unknown_features": "remain_unknown",
+  "planned_or_relocated_features": "retain_source_status",
+  "provenance": "User-requested prototype modelling assumptions; not additional source observations"
+}

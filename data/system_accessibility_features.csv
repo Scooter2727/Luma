@@ -1,0 +1,4 @@
+﻿"policy_id","scope","purpose","feature","source_id","limitation"
+"bus-external-audio","TTC buses","Identify arriving vehicle route and destination","external_route_destination_announcement","bus-audio","Vehicle feature; not an audio button or speaker installed at each stop."
+"subway-support","TTC subway system","Detect platform edges; obtain station information","platform_edge_tiles|station_announcements|braille_at_DWAs_and_elevators","subway-features","System-level description does not locate individual assets or establish exact coverage."
+"line6-intercom","Line 6 stops","Request information or emergency assistance using labelled controls","braille_labelled_passenger_assistance_intercom","line6","No individual intercom coordinates or live working status."

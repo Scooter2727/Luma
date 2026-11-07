@@ -1,0 +1,98 @@
+{
+  "author": "opendata@toronto.ca",
+  "author_email": "opendata@toronto.ca",
+  "civic_issues": [
+    "Mobility"
+  ],
+  "creator_user_id": "329e1506-b545-4fc7-a4ea-e614f220eea7",
+  "dataset_category": "Document",
+  "date_published": "2012-09-13 00:00:00",
+  "excerpt": "This data is a GIS file that outlines visually the geographical administrative boundary of the City of Toronto.",
+  "formats": [
+    "SHP"
+  ],
+  "id": "841fb820-46d0-46ac-8dcb-d20f27e57bcc",
+  "is_retired": false,
+  "isopen": false,
+  "last_refreshed": "2019-07-23 17:56:39.415158",
+  "license_id": "open-government-licence-toronto",
+  "license_title": "open-government-licence-toronto",
+  "maintainer": null,
+  "maintainer_email": "opendata@toronto.ca",
+  "metadata_created": "2022-03-10T20:42:46.468033",
+  "metadata_modified": "2025-07-24T19:54:59.75579",
+  "name": "regional-municipal-boundary",
+  "notes": "\n\n **Field Name -** Description/Definition  \n**AREA_ID -** Internal geographic identifier  \n**AREA_NAME -** Name of the former municipality  \n**OBJECTID -** Internal unique object ID\n\nThis data is a GIS file that outlines visually the geographical administrative boundary of the City of Toronto.  This data set is used for creating maps and map applications, as well as for operational use within the City of Toronto.  There are two mapping formats available:  MTM3 Degree NAD 27 and WGS84 latitude and longitude.\n",
+  "num_resources": 1,
+  "num_tags": 2,
+  "organization": {
+    "id": "6ed95875-f7d6-4200-964c-91024cc49cba",
+    "name": "city-of-toronto",
+    "title": "City of Toronto",
+    "type": "organization",
+    "description": "",
+    "image_url": "",
+    "created": "2022-03-10T15:38:51.044746",
+    "is_organization": true,
+    "approval_status": "approved",
+    "state": "active"
+  },
+  "owner_division": "Information & Technology",
+  "owner_email": "opendata@toronto.ca",
+  "owner_org": "6ed95875-f7d6-4200-964c-91024cc49cba",
+  "private": false,
+  "refresh_rate": "As available",
+  "state": "active",
+  "title": "Regional Municipal Boundary",
+  "topics": [
+    "City government",
+    "Locations and mapping"
+  ],
+  "type": "dataset",
+  "version": null,
+  "resources": [
+    {
+      "cache_last_updated": null,
+      "cache_url": null,
+      "created": "2019-07-23T17:56:39.455905",
+      "datastore_active": false,
+      "format": "SHP",
+      "hash": "",
+      "id": "41bf97f0-da1a-46a9-ac25-5ce0078d6760",
+      "is_datastore_cache_file": false,
+      "is_preview": false,
+      "last_modified": "2019-07-23T17:56:39.415158",
+      "metadata_modified": "2022-03-25T15:06:06.101803",
+      "mimetype": "application/zip",
+      "mimetype_inner": null,
+      "name": "toronto-boundary-wgs84",
+      "package_id": "841fb820-46d0-46ac-8dcb-d20f27e57bcc",
+      "position": 0,
+      "resource_type": null,
+      "revision_id": "c12ebbf4-8e91-4268-89ac-c3bef930be2d",
+      "size": 195966,
+      "state": "active",
+      "url": "https://ckan0.cf.opendata.inter.prod-toronto.ca/dataset/841fb820-46d0-46ac-8dcb-d20f27e57bcc/resource/41bf97f0-da1a-46a9-ac25-5ce0078d6760/download/toronto-boundary-wgs84.zip",
+      "url_type": "upload"
+    }
+  ],
+  "tags": [
+    {
+      "display_name": "regional boundary",
+      "id": "f1d528bc-9d6f-4929-b1d0-90121bbaac18",
+      "name": "regional boundary",
+      "state": "active",
+      "vocabulary_id": null
+    },
+    {
+      "display_name": "toronto boundary",
+      "id": "df5cd4d0-a61e-4313-bf0a-1364577c419e",
+      "name": "toronto boundary",
+      "state": "active",
+      "vocabulary_id": null
+    }
+  ],
+  "groups": [],
+  "relationships_as_subject": [],
+  "relationships_as_object": []
+}

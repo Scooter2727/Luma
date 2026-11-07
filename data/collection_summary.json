@@ -1,0 +1,13 @@
+{
+  "locations": 16765,
+  "signals": 1407,
+  "transit_stops": 9357,
+  "physical_libraries": 100,
+  "osm_tactile_records": 5834,
+  "curated_other_locations": 67,
+  "routes": 237,
+  "stop_route_direction_headsign_links": 27986,
+  "pedestrian_features": 87105,
+  "sources": 35,
+  "checks": "unique location IDs and source links passed"
+}

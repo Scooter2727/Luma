@@ -1,0 +1,30 @@
+/* Keep the supplied brand blue for surfaces; deepen text on tinted surfaces. */
+:root {
+  --readable-accent: #424ecc;
+}
+[data-theme="red-green"] {
+  --readable-accent: #00649d;
+}
+[data-theme="blue-yellow"] {
+  --readable-accent: #9b3658;
+}
+[data-theme="contrast"] {
+  --readable-accent: #ffd600;
+}
+.rail-nav button.active,
+.filter.on,
+.discovery-card button,
+.route-tag {
+  color: var(--readable-accent);
+}
+@media (max-width: 760px) {
+  .map-label {
+    font-size: 0;
+  }
+  .map-label:before {
+    font-size: 18px;
+  }
+  .map-label .online-dot {
+    display: none;
+  }
+}
