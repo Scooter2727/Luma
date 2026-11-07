@@ -69,3 +69,6 @@ Frontend tests need Playwright Chromium (`npx playwright install chromium`) and 
 ## Attribution
 
 Contains information licensed under the Open Government Licence – Toronto. Tactile snapshot © OpenStreetMap contributors, distributed by EmbedEarth under ODbL 1.0. Source links remain on location details. Basemap: OpenFreeMap / OpenMapTiles, © OpenStreetMap contributors. Custom style in public/maps/simple.json derives from OpenFreeMap Positron. Provider summaries retain links to their publishers. See `data/DATA_GUIDE.md` for collection provenance and assumptions.
+
+## Made by Scott and James for TrentHacks 2026
+
