@@ -488,6 +488,7 @@ export default function App() {
       </nav>
       <main className="workspace">
         <MapView
+          theme={prefs.theme}
           data={data}
           active={active}
           route={route}

@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import * as maplibregl from "maplibre-gl";
 import mapWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { icons, kinds } from "./model";
+import { mapIconImages, mapPalette, symbolInk } from "./mapTheme";
 import type { Coord, Feature, Route, Place, Step } from "./model";
 maplibregl.setWorkerUrl(mapWorkerUrl);
 type Props = {
+  theme: string;
   data: Feature[];
   active: string[];
   route?: Route;
@@ -16,6 +17,7 @@ type Props = {
   visible: boolean;
 };
 export default function MapView({
+  theme,
   data,
   active,
   route,
@@ -31,6 +33,8 @@ export default function MapView({
   const [mapReady, setMapReady] = useState(false),
     [mapError, setMapError] = useState(false);
   const pickModeRef = useRef(pickMode);
+  const themeRef = useRef(theme);
+  themeRef.current = theme;
   pickModeRef.current = pickMode;
   const pickRef = useRef(onPick);
   pickRef.current = onPick;
@@ -52,18 +56,16 @@ export default function MapView({
     });
     map.current = m;
     m.on("load", async () => {
-      for (const k of kinds) {
-        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 40 40"><circle cx="20" cy="21" r="18" fill="#17212f" opacity=".12"/><circle cx="20" cy="19" r="17" fill="white"/><circle cx="20" cy="19" r="14" fill="${k.color}"/><g transform="translate(8 7)" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${icons[k.id]}</g></svg>`;
-        const im = new Image();
-        im.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
-        await new Promise<void>((resolve) => {
-          im.onload = () => resolve();
-          im.onerror = () => resolve();
-        });
-        if (disposed) return;
-        if (im.complete && im.naturalWidth)
-          m.addImage(k.id, im, { pixelRatio: 2 });
+      let images: Awaited<ReturnType<typeof mapIconImages>>;
+      try {
+        images = await mapIconImages(themeRef.current);
+      } catch {
+        if (!disposed) setMapError(true);
+        return;
       }
+      if (disposed) return;
+      for (const { id, image } of images)
+        m.addImage(id, image, { pixelRatio: 2 });
       m.addSource("locations", {
         type: "geojson",
         data: { type: "FeatureCollection", features: [] },
@@ -213,6 +215,40 @@ export default function MapView({
     };
   }, []);
   useEffect(() => {
+    if (!mapReady || !map.current) return;
+    const m = map.current;
+    let cancelled = false;
+    mapIconImages(theme)
+      .then((images) => {
+        if (cancelled) return;
+        const palette = mapPalette(theme);
+        for (const { id, image } of images) m.updateImage(id, image);
+        m.setPaintProperty("clusters", "circle-color", palette.cluster);
+        m.setPaintProperty("clusters", "circle-stroke-color", palette.outline);
+        m.setPaintProperty(
+          "cluster-counts",
+          "text-color",
+          symbolInk(palette.cluster),
+        );
+        m.setPaintProperty("route-halo", "line-color", palette.halo);
+        m.setPaintProperty("route-line", "line-color", [
+          "match",
+          ["get", "mode"],
+          "bus",
+          palette.bus,
+          palette.walk,
+        ]);
+        m.setPaintProperty("route-connect", "line-color", palette.walk);
+        container.current?.setAttribute("data-icon-theme", theme);
+      })
+      .catch(() => {
+        if (!cancelled) setMapError(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [theme, mapReady]);
+  useEffect(() => {
     if (mapReady && map.current) {
       (map.current.getSource("locations") as maplibregl.GeoJSONSource).setData({
         type: "FeatureCollection",
@@ -243,12 +279,13 @@ export default function MapView({
     markers.current = [];
     if (route) {
       for (const [c, label] of [
-        [route.coordinates[0], "A"],
-        [route.coordinates.at(-1)!, "B"],
+        [route.coordinates[0], "Route start"],
+        [route.coordinates.at(-1)!, "Route destination"],
       ] as [Coord, string][]) {
         const el = document.createElement("div");
         el.className = "route-pin";
-        el.textContent = label;
+        el.setAttribute("role", "img");
+        el.setAttribute("aria-label", label);
         markers.current.push(
           new maplibregl.Marker({ element: el }).setLngLat(c).addTo(m),
         );
