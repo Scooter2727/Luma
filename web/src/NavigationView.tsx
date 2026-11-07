@@ -1,3 +1,5 @@
+import { useState } from "react";
+import CompassPanel from "./compass/CompassPanel";
 import {
   ArrowRight,
   Navigation,
@@ -12,7 +14,7 @@ import {
   Volume2,
 } from "lucide-react";
 import { SignalIcon } from "./Icons";
-import type { Preferences, Route } from "./model";
+import type { Coord, Preferences, Route } from "./model";
 import { instructionText, timeLabel } from "./model";
 type Props = {
   route: Route;
@@ -26,6 +28,8 @@ type Props = {
   where: () => void;
   report: () => void;
   notice: string;
+  pausePreview: () => void;
+  reroute: (coordinates: Coord) => void;
 };
 export default function NavigationView({
   route,
@@ -39,7 +43,10 @@ export default function NavigationView({
   where,
   report,
   notice,
+  pausePreview,
+  reroute,
 }: Props) {
+  const [compassActive, setCompassActive] = useState(false);
   const s = route.steps[step],
     upcoming = route.steps[step + 1];
   const text = instructionText(s, route.steps[step - 1], prefs.directions);
@@ -140,7 +147,7 @@ export default function NavigationView({
               <RotateCcw size={60} />
               Repeat
             </button>
-            <button onClick={togglePlaying}>
+            <button onClick={togglePlaying} disabled={compassActive}>
               {playing ? <Pause size={60} /> : <Play size={60} />}{" "}
               {playing ? "Pause" : "Play preview"}
             </button>
@@ -171,6 +178,16 @@ export default function NavigationView({
           </div>
         </>
       )}
+      <CompassPanel
+        route={route}
+        screenReader={prefs.screenReader}
+        speak={speak}
+        reroute={reroute}
+        onActivityChange={(active) => {
+          setCompassActive(active);
+          if (active) pausePreview();
+        }}
+      />
       <div className="preview-step-actions">
         <button className="text-action" disabled={!upcoming} onClick={next}>
           Next preview step <ArrowRight size={21} />

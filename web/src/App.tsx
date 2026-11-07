@@ -29,7 +29,13 @@ import {
 import type { Coord, Feature, Place, Preferences, Route } from "./model";
 import "./app.css";
 type View =
-  "home" | "routes" | "settings" | "report" | "navigate" | "map" | "saved";
+  | "home"
+  | "routes"
+  | "settings"
+  | "report"
+  | "navigate"
+  | "map"
+  | "saved";
 type Recognition = {
   lang: string;
   interimResults: boolean;
@@ -122,9 +128,9 @@ export default function App() {
     );
   const requestNumber = useRef(0),
     lastPlanned = useRef("");
-  const keyFor = (target: Place) =>
+  const keyFor = (target: Place, origin: Place = start) =>
     JSON.stringify([
-      start.coordinates,
+      origin.coordinates,
       target.coordinates,
       prefs.audible,
       prefs.fewer,
@@ -349,14 +355,14 @@ export default function App() {
     setShowOptions(false);
     setError("");
   }
-  async function plan(destination?: Place) {
+  async function plan(destination?: Place, origin: Place = start) {
     const target = destination || end;
     if (!startValid || (!destination && !endValid)) {
       setError("Choose a search suggestion or map point for both locations.");
       return;
     }
     const number = ++requestNumber.current,
-      key = keyFor(target);
+      key = keyFor(target, origin);
     lastPlanned.current = key;
     setEnd(target);
     setEndValid(true);
@@ -373,9 +379,9 @@ export default function App() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          start: start.coordinates,
+          start: origin.coordinates,
           end: target.coordinates,
-          start_name: start.name,
+          start_name: origin.name,
           end_name: target.name,
           prefer_audible: prefs.audible,
           fewer_crossings: prefs.fewer,
@@ -640,6 +646,21 @@ export default function App() {
               where={() => void whereAmI()}
               report={openReport}
               notice={notice}
+              pausePreview={() => {
+                setPlaying(false);
+                window.speechSynthesis?.cancel();
+              }}
+              reroute={(coordinates) => {
+                const origin: Place = {
+                  id: "current",
+                  name: "Your location",
+                  subtitle: "Compass GPS location",
+                  coordinates,
+                };
+                setStart(origin);
+                setStartValid(true);
+                void plan(undefined, origin);
+              }}
             />
           )}
           {view === "report" && (

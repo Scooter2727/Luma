@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@vitejs/plugin-react": "^4.7.0",
+    "geomagnetism": "^0.2.0",
     "lucide-react": "^0.468.0",
     "maplibre-gl": "^6.16.0",
     "react": "^19.0.0",
