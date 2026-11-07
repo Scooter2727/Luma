@@ -12,9 +12,11 @@ from fastapi.middleware.gzip import GZipMiddleware
 from pydantic import BaseModel,Field,field_validator
 from .walking import network,distance,walk_details,weight,ROOT
 from .transit import TZ,bus_journeys,feed_range
+from .reports import router as reports_router
 
 app=FastAPI(title='Luma',version='0.2.0')
-app.add_middleware(CORSMiddleware,allow_origins=['http://localhost:5173','http://127.0.0.1:5173'],allow_methods=['GET','POST'],allow_headers=['*'])
+app.include_router(reports_router)
+app.add_middleware(CORSMiddleware,allow_origins=['http://localhost:5173','http://127.0.0.1:5173'],allow_methods=['GET','POST','DELETE'],allow_headers=['*'])
 app.add_middleware(GZipMiddleware,minimum_size=1000)
 
 @app.exception_handler(RequestValidationError)

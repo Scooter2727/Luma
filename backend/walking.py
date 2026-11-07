@@ -160,7 +160,7 @@ def instructions(g,path):
             action=f'Head {cardinal(heading)}' if last_heading is None else turn(last_heading,heading)
             title=f"{action} {'along' if action=='Continue' or last_heading is None else 'onto'} {e['street']}"
             detail=f"Continue {metres} metres, heading {cardinal(heading)}."
-        result.append(dict(kind=kind,title=title,text=title+'. '+detail,distance=metres,coordinates=list(group['start']),end_coordinates=list(group['end']),crossing=kind=='cross',bearing=round(heading),audible=e['audible'] if kind=='cross' else None,tactile=e['tactile'] if kind=='cross' else None))
+        result.append(dict(kind=kind,title=title,text=title+'. '+detail,distance=metres,coordinates=list(group['start']),end_coordinates=list(group['end']),crossing=kind=='cross',bearing=round(heading),street=e['street'],control=e.get('control',''),audible=e['audible'] if kind=='cross' else None,tactile=e['tactile'] if kind=='cross' else None))
         last_heading=heading
     return result
 

@@ -24,15 +24,29 @@ npm run dev
 
 Open http://localhost:5173 . To view on a phone on the same Wi-Fi, use the Network URL printed by Vite and allow local network access in the firewall. Ordinary HTTP over a LAN may not permit device geolocation; the preset start works without it. HTTPS is needed for geolocation on most non-localhost devices. The Vite proxy forwards API requests, so the phone only needs port 5173.
 
-## Try it
+## Interface and demo flow
 
-- Explore the map; zoom in to reveal the existing category icons. Filters can hide individual categories.
-- Open Routes. Search both **From** and **To**, use GPS for the start, swap the endpoints, or choose a point on the map. Select a search suggestion to confirm its coordinates; unconfirmed edits disable routing.
-- **Walk** defaults to the fastest estimated walking time. Crossing preferences can prioritize listed audible signals, fewer crossings, or mapped tactile paving. A different preferred path is compared with the fastest walk. Preferences are soft penalties and can trade one feature against another. Settings persist on this device.
-- Choose a walking speed to change both walking ETAs and which buses can be reached. Changes to confirmed endpoints, mode, or preferences recalculate an existing journey automatically; stale responses are discarded.
-- **Bus + walk** finds scheduled TTC bus journeys, including walking access, boarding buffers, waiting, a direct bus or one same-stop transfer, and the final walk. Choose a departure in Toronto local time or leave now. Each result includes route numbers, headsigns, boarding/alighting stops and scheduled times. A walking alternative is also provided when connected.
-- Select a result to see its map path, ETA and complete directions. Blue is walking; brown is bus travel; dotted connections mark short unmapped approaches. Read the summary aloud, or use Preview walk / Preview journey for an explicitly labelled step simulation.
-- Settings includes four colour palettes, speech speed, larger text and screen-reader announcements. The map background and feature pictograms retain their existing design.
+The seven supplied HTML designs guide the rebuilt React interface: onboarding, Home, one-route-at-a-time comparison, navigation preview, crossing view, Report, and Settings. Atkinson Hyperlegible, large controls, visible labels, strong borders and the existing Luma palette replace the smaller layout. Desktop retains the existing map alongside the controls. On phones, Home and task screens fill the display; use the map button to open the unchanged map and category filters.
+
+- First visit opens five-step setup: voice guidance, directions style, crossing preferences, display, and confirmation. Skip setup is available. Preferences persist on this device; Settings → Privacy → Repeat setup reopens it.
+- Home offers voice entry (where supported), Type, Saved destinations, Where am I, and the last previewed destination. Before a first trip, an example Union Station → Nathan Phillips Square walk is available.
+- Routes accepts both **From** and **To**. Use suggestions, GPS for the starting point, swap endpoints, or choose map points. Unconfirmed text disables routing. Save a destination to make it available from Home → Saved.
+- Walk defaults to the fastest estimated walking time. Crossing preferences prioritize listed audible signals, fewer crossings, or mapped tactile paving using soft penalties. Choose a walking speed to change ETAs and reachable bus departures.
+- Bus + walk uses scheduled TTC journeys with access/egress walking, waiting, and up to one same-stop transfer. Choose a departure in Toronto local time or leave now. Results include route numbers, headsigns and scheduled boarding/alighting times; a walking alternative is included when connected.
+- The route chooser presents one real result at a time. Previous/Next switches routes; Read this route speaks the summary. The map button displays its geometry. Blue is walking, brown is bus travel, and dotted connectors are short unmapped approaches. Expand Step-by-step directions for the full itinerary. Edit journey returns to endpoints and preferences. Late responses cannot overwrite an edited journey.
+- Preview route opens the large navigation controls. Repeat speaks the current instruction; What’s next announces the next instruction without advancing; Next preview step explicitly advances the simulation. Pause/Play controls automatic preview progression. The preview pauses at crossings, showing the actual street name and listed/unknown feature information. End route returns focus to the preview button.
+- Clock instructions describe turns relative to the previous route segment, not the phone’s compass heading. Left/right remains the default. Both combines the instruction styles. Where am I during preview describes the simulated route position; on Home it requests GPS.
+- Settings groups Voice, Directions, Crossings, Display, Screen reader and Privacy. Four themes, speech speed and larger text are supported. Feature icon shapes and basemap styling retain their existing design. Attribution is available under Privacy → About & data.
+
+## Reports
+
+Report can be opened from the main navigation, a mapped feature, or the flag in route preview. Preview reporting carries the crossing/intersection and approximate route position into an editable location field; it is explicitly marked as a simulated position. Other reports default to the selected starting point, which must be confirmed or changed. GPS is available as an explicit action.
+
+Select Signal silent, No locator tone, Button hard to find, Tactile paving problem, Path blocked or Other issue. Voice entry fills editable notes when supported; typed entry remains available. Confirm the issue and location, add optional notes, then Save report. A success message is shown only after the server accepts the report. Back to route restores the same preview step.
+
+`POST /api/reports` validates Toronto coordinates, issue types, source and text lengths. Reports persist in ignored `data/out/luma-reports.sqlite`, with a UUID, UTC timestamp and `unverified` status. `GET /api/reports/{id}` retrieves a record by its opaque identifier without exposing the deletion key. A random deletion key is returned only on creation and stored with this browser’s report history. `DELETE /api/reports/{id}` requires that key in `X-Report-Token`. Report history and deletion are available after saving and in Settings → Privacy.
+
+Reports are prototype records: they are not sent to the City, moderated, verified, or automatically used to alter routes. The backend database and browser history survive restarts/reloads. Clearing browser storage removes the local history and deletion keys, not the server records. There are no accounts, ownership recovery or report-list endpoint; public deployment needs an account/moderation and retention design. Avoid personal information in free-text notes. Microphone recognition may use the browser provider’s speech service; app code stores only the submitted text, not recordings.
 
 ## Routing and data scope
 
@@ -46,7 +60,7 @@ Bus planning reads the retained TTC GTFS archive, combining routes, trips, stop_
 
 The pedestrian graph builds lazily on the first route request (roughly 20 seconds on the development machine; longer under load), then saves a local cache under `data/out/pedestrian-network-v3.pickle` for faster restarts. Source file or walking implementation changes invalidate it. GTFS is indexed into `data/out/ttc-schedule-v2.sqlite` on the first bus request (roughly 16 additional seconds); subsequent requests reuse it. The index rebuilds when the ZIP is newer. It is generated locally and excluded from Git. Network and cache initialization are locked against concurrent requests.
 
-Accessibility preferences do not guarantee a safe route. Construction, live crossing phases, device faults, exact entrances and curb-level direction coverage remain unknown. Bus times are scheduled, without live vehicle arrivals, cancellations or disruption data. The spoken preview is a simulation; it does not track progress with GPS or announce when it is safe to cross. GPS currently supplies the starting point only. Testing has not established suitability for independent street navigation.
+Accessibility preferences do not guarantee a safe route. Construction, live crossing phases, device faults, exact entrances and curb-level direction coverage remain unknown. Bus times are scheduled, without live vehicle arrivals, cancellations or disruption data. The spoken preview is a simulation; it does not track progress with GPS or announce when it is safe to cross. GPS can supply a starting point or report location. Testing has not established suitability for independent street navigation.
 
 The basemap needs internet. Local search and routing use the checked-in snapshots. Location records marked planned/relocated or missing coordinates are excluded. Browser speech depends on installed voices. No accounts, paid map API or external routing service is required.
 

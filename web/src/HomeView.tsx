@@ -1,0 +1,114 @@
+import { useState } from "react";
+import {
+  Mic,
+  Keyboard,
+  Star,
+  LocateFixed,
+  Clock,
+  Route as RouteIcon,
+  Map as MapIcon,
+  ArrowRight,
+} from "lucide-react";
+import PlacePicker from "./PlacePicker";
+import type { Place } from "./model";
+type Props = {
+  end: Place;
+  lastTrip: Place | null;
+  example: Place;
+  plan: (p: Place) => void;
+  map: () => void;
+  saved: () => void;
+  where: () => void;
+  dictate: (fn: (text: string) => void) => boolean;
+  listening: boolean;
+  speak: (text: string) => void;
+};
+export default function HomeView(p: Props) {
+  const [typing, setTyping] = useState(false),
+    [query, setQuery] = useState(""),
+    [destination, setDestination] = useState(p.end),
+    [valid, setValid] = useState(true);
+  return (
+    <>
+      <header className="page-header">
+        <img src="/brand/luma-symbol.png" alt="" />
+        <h1 tabIndex={-1}>Where to?</h1>
+        <button
+          className="icon-button header-map"
+          aria-label="Show map"
+          onClick={p.map}
+        >
+          <MapIcon size={27} />
+        </button>
+      </header>
+      <div className="home-content">
+        <button
+          className="voice-destination"
+          aria-pressed={p.listening}
+          onClick={() => {
+            if (
+              !p.dictate((text) => {
+                setTyping(true);
+                setQuery(text);
+                p.speak("Choose a destination matching " + text);
+              })
+            ) {
+              setTyping(true);
+              p.speak("Voice input is unavailable. Type your destination.");
+            }
+          }}
+        >
+          <Mic size={68} />
+          {p.listening ? "Listening…" : "Say where to go"}
+        </button>
+        <div className="home-actions">
+          <button className="outline-button" onClick={() => setTyping(!typing)}>
+            <Keyboard size={44} />
+            Type
+          </button>
+          <button className="outline-button" onClick={p.saved}>
+            <Star size={44} />
+            Saved
+          </button>
+        </div>
+        {typing && (
+          <div className="home-search">
+            <PlacePicker
+              label="Destination"
+              value={destination}
+              query={query}
+              onChange={(x) => {
+                setDestination(x);
+                setValid(true);
+                p.plan(x);
+              }}
+              onValidityChange={setValid}
+            />
+            <button
+              className="text-action"
+              disabled={!valid}
+              onClick={() => p.plan(destination)}
+            >
+              Choose routes
+              <ArrowRight />
+            </button>
+          </div>
+        )}
+        <button className="where-button" onClick={p.where}>
+          <LocateFixed size={52} />
+          Where am I?
+        </button>
+        <button
+          className="last-trip outline-button"
+          onClick={() => p.plan(p.lastTrip || p.example)}
+        >
+          {p.lastTrip ? <Clock size={40} /> : <RouteIcon size={40} />}
+          <span>
+            <small>{p.lastTrip ? "Last trip" : "Example journey"}</small>
+            <strong>{p.lastTrip?.name || "Try a walk"}</strong>
+          </span>
+        </button>
+      </div>
+    </>
+  );
+}
