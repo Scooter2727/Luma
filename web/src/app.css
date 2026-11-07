@@ -1583,12 +1583,55 @@ h1:focus {
   }
 }
 @media (hover: hover) and (pointer: fine) {
+  :where(button, .choice):not(:disabled):not(.text-action):not(
+      .icon-button
+    ):not(.crossing-repeat):not(
+      :where(.endpoint-tools button, .picker-results button)
+    ) {
+    transition:
+      transform 150ms ease,
+      box-shadow 150ms ease;
+  }
+  :where(button, .choice):not(:disabled):not(.text-action):not(
+      .icon-button
+    ):not(.crossing-repeat):not(
+      :where(.endpoint-tools button, .picker-results button)
+    ):hover {
+    transform: translateY(var(--hover-lift, -2px));
+    box-shadow:
+      var(--hover-inset, inset 0 0 0 transparent),
+      inset 0 1px 0 rgb(255 255 255 / 20%),
+      0 3px 0 color-mix(in srgb, var(--ink) 12%, transparent),
+      0 8px 18px color-mix(in srgb, var(--primary) 18%, transparent);
+  }
+  :where(button, .choice):not(:disabled):not(.text-action):not(
+      .icon-button
+    ):not(.crossing-repeat):not(
+      :where(.endpoint-tools button, .picker-results button)
+    ):active {
+    transform: translateY(var(--pressed-lift, 1px));
+    box-shadow:
+      var(--hover-inset, inset 0 0 0 transparent),
+      inset 0 1px 2px rgb(0 0 0 / 12%),
+      0 1px 0 color-mix(in srgb, var(--ink) 18%, transparent);
+  }
+  .main-nav > button.active {
+    --hover-inset: inset 0 4px var(--primary);
+  }
   button:not(:disabled):hover,
   .choice:hover {
     background-image: linear-gradient(
       var(--hover-shade, rgb(0 0 0 / 7%)),
       var(--hover-shade, rgb(0 0 0 / 7%))
     );
+  }
+  .endpoint-tools button:not(:disabled):hover,
+  .text-action:not(:disabled):hover {
+    background-image: none;
+    color: var(--ink);
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 4px;
   }
   .dark-button,
   .repeat-control,
@@ -1599,6 +1642,19 @@ h1:focus {
   }
   .choice {
     cursor: pointer;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --hover-lift: 0px;
+    --pressed-lift: 0px;
+  }
+  :where(button, .choice):not(:disabled):not(.text-action):not(
+      .icon-button
+    ):not(.crossing-repeat):not(
+      :where(.endpoint-tools button, .picker-results button)
+    ) {
+    transition: none;
   }
 }
 @media (max-width: 360px) {
