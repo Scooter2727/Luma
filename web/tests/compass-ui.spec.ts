@@ -94,6 +94,7 @@ async function boot(page: Page, width = 390) {
     r.fulfill({ json: { routes: [route] } }),
   );
   await page.goto("/");
+  await page.getByRole("button", { name: "Try Luma", exact: true }).click();
   await page
     .getByRole("button", { name: "Example journey Try a walk" })
     .click();
@@ -381,7 +382,7 @@ for (const width of [320, 390, 1440])
     expect(await page.evaluate(() => (window as any).compassTest.watches)).toBe(
       1,
     );
-    await expect(page.getByRole("dialog").getByRole("button")).toHaveCount(1);
+    await expect(page.getByRole("dialog").getByRole("button")).toHaveCount(2);
     const face = await page.locator(".compass-face").boundingBox();
     expect(Math.abs(face!.x + face!.width / 2 - width / 2)).toBeLessThan(2);
     expect(Math.abs(face!.y + face!.height / 2 - 450)).toBeLessThan(2);
@@ -422,7 +423,7 @@ for (const width of [320, 390, 1440])
     await expect(page.locator(".compass-reading strong")).toHaveText("90°");
     await page.keyboard.press("Tab");
     await expect(
-      page.getByRole("button", { name: "Back", exact: true }),
+      page.getByRole("button", { name: "Start demo", exact: true }),
     ).toBeFocused();
     await audit(page);
     await page.screenshot({
@@ -452,7 +453,7 @@ test("without a vibration API Compass keeps its simple face and settings explain
   await page
     .getByRole("button", { name: "Open compass mode", exact: false })
     .click();
-  await expect(page.getByRole("dialog").getByRole("button")).toHaveCount(1);
+  await expect(page.getByRole("dialog").getByRole("button")).toHaveCount(2);
   await expect(page.locator(".compass-face-status")).toContainText(
     "Vibration unavailable",
   );
@@ -616,6 +617,273 @@ test("denied Safari motion access explains what to allow on the minimal compass 
     "Allow Motion and Orientation",
   );
   await expect(page.locator(".compass-reading strong")).toHaveText("—");
-  await expect(page.getByRole("dialog").getByRole("button")).toHaveCount(1);
+  await expect(page.getByRole("dialog").getByRole("button")).toHaveCount(2);
   await page.getByRole("button", { name: "Back", exact: true }).click();
+});
+
+async function liveTargetDemo(page: Page, width = 390, height = 844) {
+  await boot(page, width);
+  await page.setViewportSize({ width, height });
+  await page.evaluate(() => {
+    Object.defineProperty(DeviceOrientationEvent, "requestPermission", {
+      configurable: true,
+      value: () => Promise.resolve("granted"),
+    });
+    (window as any).demoHeading = 0;
+    (window as any).beeps = [];
+    const create = AudioContext.prototype.createOscillator;
+    AudioContext.prototype.createOscillator = function () {
+      const node = create.call(this),
+        start = node.start.bind(node);
+      node.start = (...args: Parameters<OscillatorNode["start"]>) => {
+        (window as any).beeps.push({
+          frequency: node.frequency.value,
+          time: performance.now(),
+        });
+        start(...args);
+      };
+      return node;
+    };
+    const resume = AudioContext.prototype.resume;
+    AudioContext.prototype.resume = function () {
+      (window as any).audioFromGesture = navigator.userActivation.isActive;
+      return resume.call(this);
+    };
+    const close = AudioContext.prototype.close;
+    AudioContext.prototype.close = function () {
+      (window as any).audioClosed = true;
+      return close.call(this);
+    };
+  });
+  await page
+    .getByRole("button", { name: "Open compass mode", exact: false })
+    .click();
+  await page.evaluate(() => {
+    const update = () => {
+      const event = new Event("deviceorientation");
+      Object.assign(event, {
+        absolute: false,
+        beta: 0,
+        gamma: 0,
+        webkitCompassHeading: (window as any).demoHeading,
+        webkitCompassAccuracy: 10,
+      });
+      window.dispatchEvent(event);
+    };
+    update();
+    (window as any).demoSensorTimer = setInterval(update, 100);
+  });
+  await expect(page.locator(".compass-reading strong")).toHaveText("0°");
+  await page.evaluate(() => {
+    Math.random = () => 0.5;
+  });
+  await page.getByRole("button", { name: "Start demo", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Sound on. Mute beeps", exact: true }),
+  ).toBeVisible();
+}
+
+test("target demo beeps fast/off, slowly/adjust and advances after a continuous three-second hold", async ({
+  page,
+}) => {
+  await liveTargetDemo(page);
+  const face = page.locator(".compass-face");
+  await expect(face).toHaveAttribute("data-target", "180");
+  await expect(face).toHaveAttribute("data-demo-state", "off");
+  expect(await page.evaluate(() => (window as any).audioFromGesture)).toBe(
+    true,
+  );
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (window as any).beeps.filter((b: any) => b.frequency === 740).length,
+      ),
+    )
+    .toBeGreaterThanOrEqual(3);
+  expect(
+    await page
+      .locator(".compass-rim")
+      .evaluate((el) => getComputedStyle(el).stroke),
+  ).toBe("rgb(180, 35, 24)");
+  await page.evaluate(() => {
+    (window as any).demoHeading = 150;
+    (window as any).beeps = [];
+  });
+  await expect(face).toHaveAttribute("data-demo-state", "adjust");
+  expect(
+    await page
+      .locator(".compass-rim")
+      .evaluate((el) => getComputedStyle(el).stroke),
+  ).toBe("rgb(156, 82, 0)");
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (window as any).beeps.filter((b: any) => b.frequency === 520).length,
+      ),
+    )
+    .toBeGreaterThanOrEqual(2);
+  const intervals = await page.evaluate(() => {
+    const notes = (window as any).beeps.filter((b: any) => b.frequency === 520);
+    return notes[1].time - notes[0].time;
+  });
+  expect(intervals).toBeGreaterThan(1000);
+  await page.evaluate(() => {
+    (window as any).demoHeading = 180;
+  });
+  await expect(face).toHaveAttribute("data-demo-state", "on");
+  expect(
+    await page
+      .locator(".compass-rim")
+      .evaluate((el) => getComputedStyle(el).stroke),
+  ).toBe("rgb(6, 118, 71)");
+  await page.evaluate(() => {
+    (window as any).beeps = [];
+  });
+  await page.waitForTimeout(1200);
+  expect(await page.evaluate(() => (window as any).beeps.length)).toBe(0);
+  await page.evaluate(() => {
+    (window as any).demoHeading = 140;
+  });
+  await expect(face).toHaveAttribute("data-demo-state", "off");
+  await page.evaluate(() => {
+    (window as any).demoHeading = 180;
+    (window as any).alignedSinceTest = performance.now();
+  });
+  await expect(face).toHaveAttribute("data-demo-state", "on");
+  await page.waitForTimeout(1800);
+  await expect(face).toHaveAttribute("data-round", "1");
+  await expect(face).toHaveAttribute("data-round", "2", { timeout: 3000 });
+  expect(
+    await page.evaluate(
+      () => performance.now() - (window as any).alignedSinceTest,
+    ),
+  ).toBeGreaterThanOrEqual(3000);
+  await expect(face).toHaveAttribute("data-target", "0");
+  await page.getByRole("button", { name: "Stop demo", exact: true }).click();
+  const count = await page.evaluate(() => (window as any).beeps.length);
+  await page.waitForTimeout(700);
+  expect(await page.evaluate(() => (window as any).beeps.length)).toBe(count);
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  expect(await page.evaluate(() => (window as any).audioClosed)).toBe(true);
+});
+
+for (const viewport of [
+  { width: 320, height: 568 },
+  { width: 1440, height: 1000 },
+  { width: 844, height: 390 },
+])
+  test(`target demo fits and can mute at ${viewport.width}x${viewport.height}`, async ({
+    page,
+  }) => {
+    await liveTargetDemo(page, viewport.width, viewport.height);
+    await expect(page.locator(".compass-face")).toHaveAttribute(
+      "data-demo-state",
+      "off",
+    );
+    await page
+      .getByRole("button", { name: "Sound on. Mute beeps", exact: true })
+      .click();
+    await expect(
+      page.getByRole("button", {
+        name: "Sound off. Enable beeps",
+        exact: true,
+      }),
+    ).toHaveAttribute("aria-pressed", "false");
+    await page.evaluate(() => {
+      (window as any).beeps = [];
+    });
+    await page.waitForTimeout(700);
+    expect(await page.evaluate(() => (window as any).beeps.length)).toBe(0);
+    for (const button of await page
+      .getByRole("dialog")
+      .getByRole("button")
+      .all()) {
+      const box = await button.boundingBox();
+      expect(box!.x).toBeGreaterThanOrEqual(0);
+      expect(box!.x + box!.width).toBeLessThanOrEqual(viewport.width);
+      expect(box!.y).toBeGreaterThanOrEqual(0);
+      expect(box!.y + box!.height).toBeLessThanOrEqual(viewport.height);
+    }
+    await audit(page);
+    await page.screenshot({
+      path: `artifacts/luma-target-demo-${viewport.width}.png`,
+    });
+    await page.getByRole("button", { name: "Back", exact: true }).click();
+    expect(await page.evaluate(() => (window as any).audioClosed)).toBe(true);
+  });
+
+test("target demo keeps high contrast and large text usable on a small phone without vibration", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("luma-theme", "contrast");
+    localStorage.setItem("luma-large", "true");
+  });
+  await liveTargetDemo(page, 320, 568);
+  await page.evaluate(() =>
+    Object.defineProperty(navigator, "vibrate", {
+      configurable: true,
+      value: undefined,
+    }),
+  );
+  await expect(page.locator(".compass-demo-audio")).toContainText("Beeps only");
+  await expect(page.locator(".compass-face")).toHaveAttribute(
+    "data-demo-state",
+    "off",
+  );
+  expect(
+    await page
+      .locator(".compass-rim")
+      .evaluate((el) => getComputedStyle(el).stroke),
+  ).toBe("rgb(255, 255, 255)");
+  const back = await page
+    .getByRole("button", { name: "Back", exact: true })
+    .boundingBox();
+  const stop = await page
+    .getByRole("button", { name: "Stop demo", exact: true })
+    .boundingBox();
+  expect(back!.x + back!.width).toBeLessThanOrEqual(stop!.x);
+  const status = await page.locator(".compass-face-status").boundingBox();
+  const audio = await page.locator(".compass-demo-audio").boundingBox();
+  expect(status!.y + status!.height).toBeLessThanOrEqual(audio!.y);
+  await audit(page);
+  await page.screenshot({ path: "artifacts/luma-target-demo-contrast.png" });
+});
+
+test("blocked audio leaves the demo usable and allows an explicit sound retry", async ({
+  page,
+}) => {
+  await boot(page);
+  await page.evaluate(() => {
+    Object.defineProperty(DeviceOrientationEvent, "requestPermission", {
+      configurable: true,
+      value: () => Promise.resolve("granted"),
+    });
+    AudioContext.prototype.resume = () =>
+      Promise.reject(new DOMException("Audio blocked", "NotAllowedError"));
+    Object.defineProperty(navigator, "vibrate", {
+      configurable: true,
+      value: undefined,
+    });
+  });
+  await page
+    .getByRole("button", { name: "Open compass mode", exact: false })
+    .click();
+  await page.getByRole("button", { name: "Start demo", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Sound off. Enable beeps", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".compass-demo-audio")).toContainText(
+    "enable audio",
+  );
+  await expect(page.locator(".compass-face")).toHaveAttribute(
+    "data-demo-state",
+    "waiting",
+  );
+  await page.getByRole("button", { name: "Stop demo", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Start demo", exact: true }),
+  ).toBeVisible();
 });

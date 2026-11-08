@@ -1,8 +1,10 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Play, Square, Volume2, VolumeX } from "lucide-react";
 import type { Route } from "../model";
 import { saved } from "../model";
+import { useTargetDemo } from "./useTargetDemo";
+import { targetLabels } from "./targetDemo";
 import {
   defaults,
   labels,
@@ -46,9 +48,12 @@ export default function CompassMode({
   back: () => void;
 }) {
   const backButton = useRef<HTMLButtonElement>(null);
+  const modal = useRef<HTMLElement>(null);
+  const [demoRunning, setDemoRunning] = useState(false);
   const {
     result,
     compassHeading,
+    rawCompassHeading,
     compassReason,
     compassWarning,
     northReference,
@@ -59,26 +64,60 @@ export default function CompassMode({
     enabled: true,
     pointing: true,
     simulation: live,
-    haptics: saved("compass-haptics", true),
-    voice: saved("compass-voice", true) && !screenReader,
+    haptics: !demoRunning && saved("compass-haptics", true),
+    voice: !demoRunning && saved("compass-voice", true) && !screenReader,
     config: defaults,
     speak,
   });
+  const targetGame = useTargetDemo(
+    rawCompassHeading,
+    !compassReason && !compassWarning && rawCompassHeading !== null,
+    saved("compass-haptics", true),
+  );
+  const demo = targetGame.demo;
+  const demoState = demo?.state ?? "idle";
+  const targetX = demo
+    ? 160 + 143 * Math.sin((demo.target * Math.PI) / 180)
+    : 0;
+  const targetY = demo
+    ? 160 - 143 * Math.cos((demo.target * Math.PI) / 180)
+    : 0;
+  const turn =
+    demo?.difference !== null &&
+    demo?.difference !== undefined &&
+    demo.difference > 0
+      ? "left"
+      : "right";
+  const demoStatus = demo
+    ? demo.state === "waiting"
+      ? compassReason || compassWarning
+        ? sensorMessage(compassReason || compassWarning)
+        : "Waiting for compass"
+      : demo.state === "on"
+        ? `On track · Hold ${Math.ceil((3000 - demo.heldMs) / 1000)} s`
+        : `${targetLabels[demo.state]} · Turn phone ${turn}`
+    : "";
   useEffect(() => {
     void requestCompass(entry.permission);
     backButton.current?.focus();
   }, [entry]);
+  const displayedHeading = demo ? rawCompassHeading : compassHeading;
   const heading =
-    compassHeading === null ? null : Math.round(compassHeading) % 360;
+    displayedHeading === null ? null : Math.round(displayedHeading) % 360;
   const direction =
     heading === null ? "" : directions[Math.round(heading / 45) % 8];
   const accessibleText =
     heading === null
       ? "Compass heading unavailable. " + (compassReason || result.reason)
       : `Compass. ${heading} degrees ${direction}. ${northReference === "true" ? "True north" : "Magnetic north"}.${compassWarning ? " Approximate reading. " + compassWarning : ""}`;
+  const targetDescription = demo
+    ? ` Demo target ${Math.round(demo.target)} degrees. ${demoStatus}.`
+    : "";
   return createPortal(
     <section
+      ref={modal}
       className="compass-fullscreen"
+      data-demo-running={!!demo}
       role="dialog"
       aria-modal="true"
       aria-label="Compass mode"
@@ -89,7 +128,17 @@ export default function CompassMode({
         }
         if (e.key === "Tab") {
           e.preventDefault();
-          backButton.current?.focus();
+          const buttons = [
+            ...(modal.current?.querySelectorAll<HTMLButtonElement>(
+              "button:not(:disabled)",
+            ) || []),
+          ];
+          const index = buttons.indexOf(
+            document.activeElement as HTMLButtonElement,
+          );
+          buttons[
+            (index + (e.shiftKey ? -1 : 1) + buttons.length) % buttons.length
+          ]?.focus();
         }
       }}
     >
@@ -102,16 +151,49 @@ export default function CompassMode({
         <ArrowLeft size={28} aria-hidden="true" />
         Back
       </button>
+      <button
+        className="compass-demo-start outline-button"
+        onClick={() => {
+          if (demo) {
+            targetGame.stop();
+            setDemoRunning(false);
+          } else {
+            setDemoRunning(true);
+            targetGame.start();
+          }
+        }}
+      >
+        {demo ? (
+          <Square size={22} aria-hidden="true" />
+        ) : (
+          <Play size={22} aria-hidden="true" />
+        )}
+        {demo ? "Stop demo" : "Start demo"}
+      </button>
       <div className="compass-center">
         <div
           className="compass-face"
+          data-demo-state={demoState}
+          data-target={demo?.target}
+          data-round={demo?.round}
           role="img"
-          aria-label={accessibleText}
+          aria-label={accessibleText + targetDescription}
           data-heading={heading ?? "unknown"}
         >
           <svg viewBox="0 0 320 320" aria-hidden="true" focusable="false">
             <circle cx="160" cy="160" r="151" className="compass-rim" />
-            <g transform={`rotate(${-(compassHeading ?? 0)} 160 160)`}>
+            {demo?.state === "on" && (
+              <circle
+                cx="160"
+                cy="160"
+                r="158"
+                className="compass-hold-ring"
+                strokeDasharray={2 * Math.PI * 158}
+                strokeDashoffset={2 * Math.PI * 158 * (1 - demo.heldMs / 3000)}
+                transform="rotate(-90 160 160)"
+              />
+            )}
+            <g transform={`rotate(${-(displayedHeading ?? 0)} 160 160)`}>
               {Array.from({ length: 32 }, (_, i) => (
                 <line
                   key={i}
@@ -138,7 +220,7 @@ export default function CompassMode({
                   x={x}
                   y={y}
                   textAnchor="middle"
-                  transform={`rotate(${compassHeading ?? 0} ${x} ${y})`}
+                  transform={`rotate(${displayedHeading ?? 0} ${x} ${y})`}
                   className={
                     name === "N" ? "compass-cardinal north" : "compass-cardinal"
                   }
@@ -158,6 +240,12 @@ export default function CompassMode({
                   />
                 </>
               )}
+              {demo && (
+                <g className="compass-target">
+                  <circle cx={targetX} cy={targetY} r="12" />
+                  <circle cx={targetX} cy={targetY} r="4" />
+                </g>
+              )}
             </g>
             <path d="M151 1 169 1 160 14Z" className="compass-phone-marker" />
           </svg>
@@ -172,23 +260,62 @@ export default function CompassMode({
           aria-live="polite"
           aria-atomic="true"
         >
-          {heading === null
-            ? compassReason
-              ? sensorMessage(compassReason)
-              : "Waiting for compass"
-            : compassWarning
-              ? sensorMessage(compassWarning)
-              : result.state === "UNCERTAIN"
-                ? northReference === "true"
-                  ? "True north"
-                  : "Magnetic north"
-                : labels[result.state]}
+          {demo ? (
+            <>
+              <span className="compass-demo-label">Pointing demo</span>
+              {demoStatus}
+            </>
+          ) : heading === null ? (
+            compassReason ? (
+              sensorMessage(compassReason)
+            ) : (
+              "Waiting for compass"
+            )
+          ) : compassWarning ? (
+            sensorMessage(compassWarning)
+          ) : result.state === "UNCERTAIN" ? (
+            northReference === "true" ? (
+              "True north"
+            ) : (
+              "Magnetic north"
+            )
+          ) : (
+            labels[result.state]
+          )}
           <span className="sr-only">
-            . {compassReason || compassWarning || result.reason}
+            . {compassReason || compassWarning || (demo ? "" : result.reason)}
             {!hapticsAvailable ? " Vibration unavailable in this browser." : ""}
           </span>
         </p>
       </div>
+      {demo && (
+        <div className="compass-demo-audio">
+          <button
+            className="outline-button"
+            aria-pressed={targetGame.sound}
+            aria-label={
+              targetGame.sound
+                ? "Sound on. Mute beeps"
+                : "Sound off. Enable beeps"
+            }
+            onClick={targetGame.toggleSound}
+          >
+            {targetGame.sound ? (
+              <Volume2 size={24} aria-hidden="true" />
+            ) : (
+              <VolumeX size={24} aria-hidden="true" />
+            )}
+            {targetGame.sound ? "Sound on" : "Sound off"}
+          </button>
+          <p role="status">
+            {targetGame.audioError
+              ? "Tap Sound off to enable audio."
+              : !hapticsAvailable
+                ? "Beeps only · vibration unavailable"
+                : "Vibration on supported devices"}
+          </p>
+        </div>
+      )}
     </section>,
     document.body,
   );

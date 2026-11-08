@@ -214,7 +214,9 @@ h1:focus {
   align-items: center;
   justify-content: center;
   font-weight: 700;
-  box-shadow: 0 0 0 2px #17212f, 0 3px 8px #17212f44;
+  box-shadow:
+    0 0 0 2px #17212f,
+    0 3px 8px #17212f44;
 }
 .panel {
   position: absolute;
@@ -1195,11 +1197,140 @@ h1:focus {
   text-underline-offset: 3px;
 }
 .compass-fullscreen {
+  --demo-off: #b42318;
+  --demo-adjust: #9c5200;
+  --demo-on: #067647;
   position: fixed;
   inset: 0;
   z-index: 100;
   background: var(--surface);
   color: var(--ink);
+}
+.compass-demo-start.outline-button {
+  position: absolute;
+  z-index: 1;
+  top: max(20px, env(safe-area-inset-top));
+  right: max(20px, env(safe-area-inset-right));
+  width: auto;
+  min-width: 140px;
+  min-height: 60px;
+  margin: 0;
+  padding: 12px;
+  font-size: 20px;
+}
+@media (max-width: 360px) {
+  .compass-demo-start.outline-button {
+    min-width: 0;
+    max-width: calc(50vw - 28px);
+  }
+  .compass-back.outline-button {
+    max-width: calc(50vw - 28px);
+  }
+}
+.compass-fullscreen[data-demo-running="true"] .compass-center {
+  inset: 80px 0 112px;
+}
+.compass-fullscreen[data-demo-running="true"] .compass-face {
+  width: min(78vw, 40dvh, 420px);
+}
+.compass-fullscreen[data-demo-running="true"] .compass-face-status {
+  top: calc(50% + min(39vw, 20dvh, 210px) + 24px);
+  font-size: 20px;
+}
+.compass-face[data-demo-state="off"] .compass-rim {
+  stroke: var(--demo-off);
+  stroke-width: 8;
+  stroke-dasharray: 5 3;
+}
+.compass-face[data-demo-state="adjust"] .compass-rim {
+  stroke: var(--demo-adjust);
+  stroke-width: 8;
+  stroke-dasharray: 16 4;
+}
+.compass-face[data-demo-state="on"] .compass-rim {
+  stroke: var(--demo-on);
+  stroke-width: 8;
+}
+.compass-hold-ring {
+  fill: none;
+  stroke: var(--demo-on);
+  stroke-width: 3;
+}
+.compass-target circle:first-child {
+  fill: var(--primary);
+  stroke: var(--surface);
+  stroke-width: 4;
+}
+.compass-target circle:last-child {
+  fill: var(--primary-text);
+}
+.compass-demo-label {
+  display: block;
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.compass-demo-audio {
+  position: absolute;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  width: min(90vw, 380px);
+}
+.compass-demo-audio .outline-button {
+  min-height: 52px;
+  width: auto;
+  min-width: 150px;
+  padding: 10px 16px;
+  margin: 0 auto;
+  font-size: 20px;
+}
+.compass-demo-audio p {
+  margin: 8px 0 0;
+  font-size: 16px;
+  line-height: 1.35;
+}
+[data-theme="red-green"] .compass-fullscreen {
+  --demo-off: #0072b2;
+  --demo-adjust: #946100;
+  --demo-on: #17212f;
+}
+[data-theme="blue-yellow"] .compass-fullscreen {
+  --demo-off: #9b3658;
+  --demo-adjust: #254653;
+  --demo-on: #17212f;
+}
+[data-theme="contrast"] .compass-fullscreen {
+  --demo-off: #fff;
+  --demo-adjust: #ffd600;
+  --demo-on: #fff;
+}
+@media (max-height: 500px) and (min-width: 600px) {
+  .compass-fullscreen[data-demo-running="true"] .compass-center {
+    inset: 80px 180px 12px 0;
+  }
+  .compass-fullscreen[data-demo-running="true"] .compass-face {
+    width: min(42vw, 62dvh, 320px);
+  }
+  .compass-fullscreen[data-demo-running="true"] .compass-face-status {
+    position: fixed;
+    top: 110px;
+    right: 20px;
+    width: 140px;
+    max-width: none;
+    font-size: 18px;
+  }
+  .compass-demo-audio {
+    left: auto;
+    right: 20px;
+    width: 140px;
+    transform: none;
+    bottom: 20px;
+  }
+  .compass-demo-audio .outline-button {
+    min-width: 140px;
+  }
 }
 .compass-back.outline-button {
   position: absolute;

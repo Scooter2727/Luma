@@ -7,6 +7,7 @@ async function boot(page: Page, width = 390, height = 844) {
     localStorage.setItem("luma-onboarding-complete", "true"),
   );
   await page.goto("/");
+  await page.getByRole("button", { name: "Try Luma", exact: true }).click();
 }
 async function audit(page: Page) {
   const result = await new AxeBuilder({ page }).exclude(".map").analyze();
@@ -115,6 +116,7 @@ test("five-step onboarding saves direction, crossing and display choices", async
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
+  await page.getByRole("button", { name: "Try Luma", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Voice guidance", exact: true }),
   ).toBeVisible();
@@ -139,6 +141,7 @@ test("five-step onboarding saves direction, crossing and display choices", async
     page.getByRole("heading", { name: "Where to?", exact: true }),
   ).toBeVisible();
   await page.reload();
+  await page.getByRole("button", { name: "Try Luma", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Where to?", exact: true }),
   ).toBeVisible();
@@ -368,6 +371,7 @@ test("navigation, actual crossing state and reporting keep the current route ste
     page.getByRole("button", { name: "Preview route 1", exact: true }),
   ).toBeFocused();
   await page.reload();
+  await page.getByRole("button", { name: "Try Luma", exact: true }).click();
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByRole("button", { name: "Privacy", exact: true }).click();
   await page

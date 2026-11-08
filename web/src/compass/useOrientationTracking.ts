@@ -63,6 +63,9 @@ export function useOrientationTracking({
   const [fix, setFix] = useState<Fix | null>(null);
   const [expected, setExpected] = useState<number | null>(null);
   const [compassHeading, setCompassHeading] = useState<number | null>(null);
+  const [rawCompassHeading, setRawCompassHeading] = useState<number | null>(
+    null,
+  );
   const [compassReason, setCompassReason] = useState("");
   const [compassWarning, setCompassWarning] = useState("");
   const [northReference, setNorthReference] = useState<
@@ -92,6 +95,7 @@ export function useOrientationTracking({
     setOffRoute(false);
     setExpected(null);
     setCompassHeading(null);
+    setRawCompassHeading(null);
     setCompassReason("");
     setCompassWarning("");
     setNorthReference(null);
@@ -206,6 +210,7 @@ export function useOrientationTracking({
             ? magneticToTrue(rawCompass.magnetic, gps, new Date(now))
             : null;
         const faceHeading = corrected ?? rawCompass.magnetic;
+        setRawCompassHeading(faceHeading);
         setCompassHeading((previous) =>
           previous === null
             ? faceHeading
@@ -216,6 +221,7 @@ export function useOrientationTracking({
         setNorthReference(corrected === null ? "magnetic" : "true");
       } else {
         setCompassHeading(null);
+        setRawCompassHeading(null);
         setNorthReference(null);
       }
       let target: number | null = null,
@@ -323,6 +329,7 @@ export function useOrientationTracking({
     result,
     expected,
     compassHeading,
+    rawCompassHeading,
     compassReason,
     compassWarning,
     northReference,
