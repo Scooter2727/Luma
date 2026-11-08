@@ -29,8 +29,8 @@ async function boot(
   await page.route("**/api/speech/status", (r) =>
     r.fulfill({ json: { available } }),
   );
-  await page.route("**/api/speech/synthesize", (r) => {
-    texts.push(r.request().postDataJSON().text);
+  await page.route("**/api/speech/synthesize?*", (r) => {
+    texts.push(new URL(r.request().url()).searchParams.get("text") || "");
     return synthesize === "audio"
       ? r.fulfill({ body: silentWav(), contentType: "audio/wav" })
       : r.fulfill({ status: 503, json: { detail: "AI voice could not be generated." } });
@@ -135,7 +135,7 @@ async function recordDeviceSpeech(page: Page) {
   });
 }
 
-test("route preview speaks rephrased steps and prefetches the next one", async ({
+test("routes prefetch the rephrased first steps so the preview starts without waiting", async ({
   page,
 }) => {
   const rephrased: number[] = [];
@@ -146,14 +146,31 @@ test("route preview speaks rephrased steps and prefetches the next one", async (
   });
   await recordDeviceSpeech(page);
   const texts = await boot(page, true, "audio", { "luma-ai-voice": "true" });
-  await previewWalk(page);
-  await expect.poll(() => texts.length).toBeGreaterThanOrEqual(2);
+  await page
+    .getByRole("button", { name: "Example journey Try a walk" })
+    .click();
+  // The first two steps are fetched while routes are still being compared.
+  await expect
+    .poll(() => texts.filter((t) => t.startsWith("Natural. ")).length, {
+      timeout: 65000,
+    })
+    .toBeGreaterThanOrEqual(2);
+  const beforePreview = texts.length;
+  await page
+    .getByRole("button", { name: "Preview route 1", exact: true })
+    .click();
+  await expect(page.locator(".navigation-screen")).toBeVisible();
+  await expect(page.locator(".sr-only[role=status]")).not.toBeEmpty();
   expect(rephrased.length).toBeGreaterThan(0);
-  // The current step and the prefetched next step, in either network order.
-  expect(texts.slice(0, 2).sort()).toEqual([
-    expect.stringMatching(/^Natural\. Head east along Front St W/),
-    expect.stringMatching(/^Natural\. Join the mapped pedestrian path/),
-  ]);
+  // The first two steps were already downloaded, so the preview does not wait on the network.
+  const early = texts.slice(0, beforePreview);
+  expect(texts.slice(beforePreview).filter((t) => early.includes(t))).toEqual([]);
+  expect(texts).toEqual(
+    expect.arrayContaining([
+      expect.stringMatching(/^Natural\. Join the mapped pedestrian path/),
+      expect.stringMatching(/^Natural\. Head east along Front St W/),
+    ]),
+  );
   await expect(page.locator(".navigation-screen")).toBeVisible();
   expect(
     await page.evaluate(

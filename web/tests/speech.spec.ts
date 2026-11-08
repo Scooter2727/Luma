@@ -35,7 +35,7 @@ async function load(
   await page.route("**/api/speech/status", (r) =>
     r.fulfill({ json: { available } }),
   );
-  await page.route("**/api/speech/synthesize", async (r) => {
+  await page.route("**/api/speech/synthesize?*", async (r) => {
     calls.synthesize++;
     if (synthesize === "404") return r.fulfill({ status: 404, json: {} });
     if (synthesize === "audio")
@@ -72,8 +72,8 @@ test("a slow synthesis response times out as failed", async ({ page }) => {
     return [await window.speech.playAiSpeech("Slow.", 1), performance.now() - t];
   });
   expect(outcome).toBe("failed");
-  expect(elapsed).toBeGreaterThan(2000);
-  expect(elapsed).toBeLessThan(3500);
+  expect(elapsed).toBeGreaterThan(1300);
+  expect(elapsed).toBeLessThan(2500);
 });
 
 test("an unconfigured server is never asked to synthesize", async ({ page }) => {
@@ -120,5 +120,64 @@ test("audio plays at the speech rate, reuses one element and can be stopped", as
     elements: 1,
     available: true,
   });
+  expect(calls.synthesize).toBeGreaterThanOrEqual(1);
+});
+
+test("prefetched audio plays without another request and slow prefetches are kept", async ({
+  page,
+}) => {
+  const calls = await load(page, true, "hang");
+  const result = await page.evaluate(async () => {
+    const s = window.speech;
+    s.prefetchAiSpeech("Next step.");
+    await new Promise((resolve) => setTimeout(resolve, 4500));
+    const t = performance.now();
+    const outcome = await s.playAiSpeech("Next step.", 1);
+    return { outcome, elapsed: performance.now() - t };
+  });
+  expect(result.outcome).toBe("played");
+  expect(result.elapsed).toBeLessThan(1000);
   expect(calls.synthesize).toBe(1);
+});
+
+test("speaking text that is still prefetching reuses that request", async ({
+  page,
+}) => {
+  const calls = await load(page, true, "audio");
+  const outcome = await page.evaluate(async () => {
+    const s = window.speech;
+    s.prefetchAiSpeech("Soon.");
+    return s.playAiSpeech("Soon.", 1);
+  });
+  expect(outcome).toBe("played");
+  expect(calls.synthesize).toBe(1);
+});
+
+test("a tap unlocks the shared audio element for later playback", async ({
+  page,
+}) => {
+  await load(page, true, "audio");
+  await page.evaluate(() => {
+    const s = window.speech;
+    const button = document.createElement("button");
+    button.textContent = "Unlock";
+    button.style.cssText = "position:fixed;inset:0 auto auto 0;z-index:2147483647";
+    button.onclick = () => s.unlockAiAudio();
+    document.body.prepend(button);
+    const Original = window.Audio;
+    window.Audio = function () {
+      const a = new Original();
+      (window as unknown as { shared: HTMLAudioElement }).shared = a;
+      return a;
+    } as unknown as typeof Audio;
+  });
+  await page.getByRole("button", { name: "Unlock" }).click();
+  expect(
+    await page.evaluate(
+      () => (window as unknown as { shared: HTMLAudioElement }).shared.src,
+    ),
+  ).toMatch(/^blob:/);
+  expect(
+    await page.evaluate(() => window.speech.playAiSpeech("After tap.", 1)),
+  ).toBe("played");
 });

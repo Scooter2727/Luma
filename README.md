@@ -30,7 +30,7 @@ AI voice is optional. To enable it locally, copy `.env.example` to `.env` and fi
 | `GEMINI_MODEL` | Gemini model | `gemini-3.8-flash` (`gemini-2.5-flash` is closed to new keys) |
 | `ELEVENLABS_API_KEY` | ElevenLabs API key, starting with `sk_` (not the key ID) | Required for AI voice |
 | `ELEVENLABS_VOICE_ID` | ElevenLabs voice | Premade "George" voice |
-| `ELEVENLABS_MODEL_ID` | ElevenLabs model | `eleven_turbo_v2_5` |
+| `ELEVENLABS_MODEL_ID` | ElevenLabs model | `eleven_flash_v2_5` |
 
 Open http://localhost:5173 . To view on a phone on the same Wi-Fi, use the Network URL printed by Vite and allow local network access in the firewall. Ordinary HTTP over a LAN may not permit device geolocation; the preset start works without it. HTTPS is needed for geolocation on most non-localhost devices. The Vite proxy forwards API requests, so the phone only needs port 5173.
 
@@ -53,7 +53,7 @@ Walking and transit caches use the system temporary directory when Vercel inject
 
 **Hosted report saving is intentionally disabled**, as requested. `GET /api/reports/status` advertises availability to the UI. Vercel report POST/read/delete endpoints return 503 before opening SQLite, and the interface disables Save report with an explanation. Local reports continue to persist in SQLite. Do not move report storage into `/tmp` and call it durable: [Vercel does not provide persistent local SQLite storage](https://vercel.com/kb/guide/is-sqlite-supported-in-vercel). A shared persistent database is required before hosted reporting can be enabled.
 
-**AI voice keys are Vercel Environment Variables for the `backend` service**, set in the Vercel project dashboard (or with `npx vercel env add`), not in `vercel.json` and never as `VITE_*` variables. `VITE_*` values are compiled into the public frontend bundle. `.env` is excluded from uploads, and the deployed backend does not read it. `GET /api/speech/status` advertises availability to the UI, as reports do. Without both keys, `POST /api/speech/synthesize` returns 503 and the AI voice option stays hidden. Synthesized audio is cached in the same disposable cache directory (`speech-cache/`) and is regenerated on cold instances. The synthesis and rephrase endpoints are unauthenticated proxies to paid APIs, capped at 1,000 characters per text and 80 steps per route; a public deployment needs rate limiting or authentication before keys are added.
+**AI voice keys are Vercel Environment Variables for the `backend` service**, set in the Vercel project dashboard (or with `npx vercel env add`), not in `vercel.json` and never as `VITE_*` variables. `VITE_*` values are compiled into the public frontend bundle. `.env` is excluded from uploads, and the deployed backend does not read it. `GET /api/speech/status` advertises availability to the UI, as reports do. Without both keys, `/api/speech/synthesize` returns 503 and the AI voice option stays hidden. Synthesized audio is cached in the same disposable cache directory (`speech-cache/`) and is regenerated on cold instances. The synthesis and rephrase endpoints are unauthenticated proxies to paid APIs, capped at 1,000 characters per text and 80 steps per route; a public deployment needs rate limiting or authentication before keys are added.
 
 To test the integrated deployment:
 
@@ -95,7 +95,14 @@ AI-generated phrasing and third-party voice synthesis are best-effort. Luma fall
 
 Every route step carries `ai_text`: the instruction in the chosen directions style, built on the server the same way as the browser's `instructionText()`. After routes load with AI voice on, the browser asks `POST /api/speech/rephrase` to reword each route in one Gemini request, in the background. A 20-step route takes about 6 seconds, so route planning never waits for it. Gemini runs at temperature 0.2 under instructions to add no facts. The server then keeps a rewrite only if it preserves the street name, every number, the left/right/clock wording and every caution such as "unknown" or "confirm", adds no signal, tactile or crossing claims, and stays within 1.5 times the original length. Anything else, including errors, timeouts and malformed replies, keeps the original wording.
 
-`POST /api/speech/synthesize` returns ElevenLabs MP3 audio, cached on disk by text, voice and model. The browser waits 2.5 seconds per instruction before speaking it with the device voice instead. Two failures in a row turn AI voice off for the rest of the session; the status line reports it, and Test AI voice tries again. During a preview, audio for the next step is fetched while the current one plays. When AI voice is on, instruction text, including street and destination names, is sent to Google and ElevenLabs. GPS coordinates are not sent.
+`/api/speech/synthesize` (`GET ?text=` for the audio element, or `POST` with a JSON body) streams 64 kbps MP3 from ElevenLabs' low-latency Flash model as it is generated, and caches complete clips on disk by text, voice and model. To keep speech prompt:
+
+- While routes are compared, audio for each route's first two steps is downloaded, and downloaded again once background rephrasing changes their wording. During a preview, the next step is downloaded while the current one plays. Downloaded clips start instantly.
+- Anything not yet downloaded plays through the audio element as it streams, so speech starts with the first bytes rather than after the whole clip.
+- If speech has not started within 1.5 seconds, the instruction is spoken with the device voice instead. Background downloads may take up to 10 seconds.
+- Taps that can lead to AI speech (turning it on, Test AI voice, starting a preview) play a silent clip, so iOS Safari later allows instructions that are not triggered by a tap.
+
+Two failures in a row turn AI voice off for the rest of the session; the status line reports it, and Test AI voice tries again. When AI voice is on, instruction text, including street and destination names, is sent to Google and ElevenLabs. GPS coordinates are not sent.
 
 ## Routing and data scope
 
@@ -145,7 +152,7 @@ npm run test:e2e
 
 Frontend tests need Playwright Chromium (`npx playwright install chromium`) and both local servers running.
 
-`pytest backend` includes the AI voice tests (`test_speech_phrasing.py`, `test_speech_audio.py`, `test_speech_api.py` and the `ai_text` cases in `test_routing.py`). They mock Gemini and ElevenLabs, and `backend/conftest.py` clears the speech keys, so they never use a real key or the network, even with a filled-in `.env`. `web/tests/speech.spec.ts` and `web/tests/speech-ui.spec.ts` cover the browser fallback, circuit breaker, Settings toggle and navigation prefetch against mocked speech endpoints.
+`pytest backend` includes the AI voice tests (`test_speech_phrasing.py`, `test_speech_audio.py`, `test_speech_api.py` and the `ai_text` cases in `test_routing.py`). They mock Gemini and ElevenLabs, and `backend/conftest.py` clears the speech keys, so they never use a real key or the network, even with a filled-in `.env`. `web/tests/speech.spec.ts` and `web/tests/speech-ui.spec.ts` cover the browser fallback, start timeout, circuit breaker, prefetching, iOS audio unlock and Settings toggle against mocked speech endpoints.
 
 ## Attribution
 

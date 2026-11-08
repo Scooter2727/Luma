@@ -44,6 +44,7 @@ import {
   prefetchAiSpeech,
   resetAiSpeechSession,
   stopAiSpeech,
+  unlockAiAudio,
 } from "./speech";
 import "./app.css";
 type View =
@@ -167,8 +168,10 @@ export default function App() {
   currentKey.current = planningKey;
   const route = routes[routeIndex],
     currentStep = route?.steps[step];
-  const change = (values: Partial<Preferences>) =>
+  const change = (values: Partial<Preferences>) => {
+    if (values.aiVoice) unlockAiAudio();
     setPrefs((p) => ({ ...p, ...values }));
+  };
   const [speechAvailable, setSpeechAvailable] = useState(false),
     [aiVoiceReady, setAiVoiceReady] = useState(aiSpeechAvailable);
   useEffect(() => {
@@ -192,6 +195,7 @@ export default function App() {
     const turn = ++speechTurn.current;
     if (prefs.screenReader) return;
     if (prefs.aiVoice && aiSpeechAvailable()) {
+      unlockAiAudio();
       window.speechSynthesis?.cancel();
       void playAiSpeech(aiText, prefs.rate).then((outcome) => {
         if (outcome === "failed" && turn === speechTurn.current)
@@ -206,6 +210,7 @@ export default function App() {
     setNotice(text);
     const turn = ++speechTurn.current;
     resetAiSpeechSession();
+    unlockAiAudio();
     window.speechSynthesis?.cancel();
     void playAiSpeech(text, prefs.rate).then((outcome) => {
       if (outcome !== "failed" || turn !== speechTurn.current) return;
@@ -321,15 +326,31 @@ export default function App() {
       instructionText(currentStep, route.steps[step - 1], prefs.directions),
       aiInstructionText(route, step, prefs.directions),
     );
-    if (
-      prefs.aiVoice &&
-      !prefs.screenReader &&
-      aiSpeechAvailable() &&
-      step + 1 < route.steps.length
-    )
-      prefetchAiSpeech(aiInstructionText(route, step + 1, prefs.directions));
     if (currentStep.crossing) setPlaying(false);
   }, [view, step]);
+  useEffect(() => {
+    if (!prefs.aiVoice || prefs.screenReader || !aiVoiceReady || !route) return;
+    // While choosing, fetch the first two steps so the preview starts instantly; during the
+    // preview, fetch only the next step. Re-runs when background rephrasing changes the wording.
+    const upcoming =
+      view === "navigate"
+        ? [step + 1]
+        : view === "routes" && showOptions
+          ? [0, 1]
+          : [];
+    for (const i of upcoming)
+      if (i < route.steps.length)
+        prefetchAiSpeech(aiInstructionText(route, i, prefs.directions));
+  }, [
+    route,
+    step,
+    view,
+    showOptions,
+    prefs.aiVoice,
+    prefs.screenReader,
+    prefs.directions,
+    aiVoiceReady,
+  ]);
   useEffect(() => {
     if (!playing || view !== "navigate" || !route) return;
     const t = setTimeout(
@@ -541,6 +562,7 @@ export default function App() {
     } catch {}
   }
   function startPreview() {
+    if (prefs.aiVoice) unlockAiAudio();
     setStep(0);
     setPlaying(true);
     setLastTrip(end);

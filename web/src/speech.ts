@@ -1,6 +1,9 @@
 export type AiSpeechOutcome = "played" | "failed" | "stopped";
 
-const TIMEOUT_MS = 2500;
+// Fall back to the device voice if AI speech has not started by then.
+const START_TIMEOUT_MS = 1500;
+// Prefetches run in the background, so they can wait for slower syntheses.
+const PREFETCH_TIMEOUT_MS = 10000;
 const FAILURE_LIMIT = 2;
 const CACHE_LIMIT = 24;
 
@@ -10,7 +13,8 @@ let failures = 0;
 let generation = 0;
 let element: HTMLAudioElement | null = null;
 let objectUrl = "";
-let inflight: AbortController | null = null;
+let unlocked = false;
+let silence = "";
 let finish: ((outcome: AiSpeechOutcome) => void) | null = null;
 const blobs = new Map<string, Blob>();
 const pending = new Map<string, Promise<Blob | null>>();
@@ -60,17 +64,12 @@ function remember(text: string, blob: Blob) {
   blobs.set(text, blob);
   while (blobs.size > CACHE_LIMIT) blobs.delete(blobs.keys().next().value!);
 }
-async function download(text: string, signal?: AbortSignal) {
-  const timeout = new AbortController();
-  const timer = setTimeout(() => timeout.abort(), TIMEOUT_MS);
-  const abort = () => timeout.abort();
-  signal?.addEventListener("abort", abort);
+const synthesisUrl = (text: string) =>
+  "/api/speech/synthesize?text=" + encodeURIComponent(text);
+async function download(text: string) {
   try {
-    const r = await fetch("/api/speech/synthesize", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text }),
-      signal: timeout.signal,
+    const r = await fetch(synthesisUrl(text), {
+      signal: AbortSignal.timeout(PREFETCH_TIMEOUT_MS),
     });
     if (!r.ok || !r.headers.get("content-type")?.startsWith("audio/"))
       return null;
@@ -80,9 +79,6 @@ async function download(text: string, signal?: AbortSignal) {
     return blob;
   } catch {
     return null;
-  } finally {
-    clearTimeout(timer);
-    signal?.removeEventListener("abort", abort);
   }
 }
 function audioElement() {
@@ -93,11 +89,48 @@ function release() {
   if (objectUrl) URL.revokeObjectURL(objectUrl);
   objectUrl = "";
 }
+function silentClip() {
+  if (silence) return silence;
+  const samples = 800,
+    view = new DataView(new ArrayBuffer(44 + samples));
+  const ascii = (offset: number, text: string) =>
+    [...text].forEach((c, i) => view.setUint8(offset + i, c.charCodeAt(0)));
+  ascii(0, "RIFF");
+  view.setUint32(4, 36 + samples, true);
+  ascii(8, "WAVEfmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, 8000, true);
+  view.setUint32(28, 8000, true);
+  view.setUint16(32, 1, true);
+  view.setUint16(34, 8, true);
+  ascii(36, "data");
+  view.setUint32(40, samples, true);
+  for (let i = 0; i < samples; i++) view.setUint8(44 + i, 128);
+  silence = URL.createObjectURL(new Blob([view], { type: "audio/wav" }));
+  return silence;
+}
+/**
+ * iOS Safari only lets an audio element play outside a tap once it has been played from a tap.
+ * Call this from tap handlers; it is a no-op once unlocked or outside a user gesture.
+ */
+export function unlockAiAudio() {
+  const activation = (
+    navigator as Navigator & { userActivation?: { isActive: boolean } }
+  ).userActivation;
+  if (unlocked || finish || activation?.isActive === false) return;
+  unlocked = true;
+  const audio = audioElement();
+  audio.src = silentClip();
+  audio.play().catch((e: DOMException) => {
+    // Interrupting the silent clip with real speech still leaves the element unlocked.
+    if (e.name === "NotAllowedError") unlocked = false;
+  });
+}
 /** Stop AI audio immediately. Any pending playAiSpeech call resolves "stopped". */
 export function stopAiSpeech() {
   generation++;
-  inflight?.abort();
-  inflight = null;
   const done = finish;
   finish = null;
   if (element) {
@@ -112,12 +145,27 @@ export function cancelAllSpeech() {
   stopAiSpeech();
   globalThis.speechSynthesis?.cancel();
 }
-/** Warm the audio cache for text that is likely to be spoken next. */
+/** Download audio for text that is likely to be spoken next, so it can start instantly. */
 export function prefetchAiSpeech(text: string) {
-  if (!aiSpeechAvailable() || blobs.has(text) || pending.has(text)) return;
-  const request = download(text).finally(() => pending.delete(text));
+  if (status === false || blobs.has(text) || pending.has(text)) return;
+  const request = loadSpeechStatus()
+    .then(() => (aiSpeechAvailable() ? download(text) : null))
+    .finally(() => pending.delete(text));
   pending.set(text, request);
 }
+/** Wait briefly for an in-flight prefetch rather than synthesizing the same text twice. */
+function awaitPrefetch(text: string) {
+  const request = pending.get(text);
+  if (!request) return Promise.resolve(blobs.get(text) ?? null);
+  return Promise.race([
+    request,
+    new Promise<null>((r) => setTimeout(() => r(null), START_TIMEOUT_MS)),
+  ]);
+}
+/**
+ * Play downloaded audio instantly, or stream it so speech starts with the first bytes.
+ * Resolves "failed" if speech has not started within START_TIMEOUT_MS.
+ */
 export async function playAiSpeech(
   text: string,
   rate: number,
@@ -125,35 +173,39 @@ export async function playAiSpeech(
   stopAiSpeech();
   const id = generation;
   if (!(await loadSpeechStatus()) || !aiSpeechAvailable()) return "failed";
+  const waited = pending.has(text);
+  const blob = await awaitPrefetch(text);
   if (id !== generation) return "stopped";
-  let blob = blobs.get(text) || null;
-  if (!blob) {
-    const controller = new AbortController();
-    inflight = controller;
-    blob = await (pending.get(text) ?? download(text, controller.signal));
-    if (id !== generation) return "stopped";
-    inflight = null;
-  }
-  if (!blob) {
+  if (waited && !blob) {
     recordFailure();
     return "failed";
   }
   const audio = audioElement();
+  if (blob) remember(text, blob);
   release();
-  objectUrl = URL.createObjectURL(blob);
+  if (blob) objectUrl = URL.createObjectURL(blob);
   return new Promise<AiSpeechOutcome>((resolve) => {
+    const timer = setTimeout(() => finish?.("failed"), START_TIMEOUT_MS);
     finish = (outcome) => {
+      clearTimeout(timer);
       finish = null;
       audio.onended = audio.onerror = audio.onplaying = null;
-      if (outcome === "failed") recordFailure();
+      if (outcome === "failed") {
+        recordFailure();
+        audio.pause();
+        audio.removeAttribute("src");
+      }
       release();
       resolve(outcome);
     };
-    audio.onplaying = recordSuccess;
+    audio.onplaying = () => {
+      clearTimeout(timer);
+      recordSuccess();
+    };
     audio.onended = () => finish?.("played");
     audio.onerror = () => finish?.("failed");
-    audio.src = objectUrl;
-    audio.playbackRate = rate;
+    audio.src = objectUrl || synthesisUrl(text);
+    audio.defaultPlaybackRate = audio.playbackRate = rate;
     audio.play().catch(() => {
       if (id === generation) finish?.("failed");
     });
