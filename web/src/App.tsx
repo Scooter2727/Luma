@@ -183,12 +183,6 @@ export default function App() {
     void loadSpeechStatus().then(setSpeechAvailable);
     return unsubscribe;
   }, []);
-  function speechKeysSaved() {
-    void refreshSpeechStatus().then((available) => {
-      setSpeechAvailable(available);
-      setAiVoiceReady(aiSpeechAvailable());
-    });
-  }
   const speechTurn = useRef(0);
   function deviceSpeak(text: string) {
     if (!("speechSynthesis" in window)) return;
@@ -603,7 +597,6 @@ export default function App() {
     speechAvailable,
     aiVoiceReady,
     testAiVoice,
-    onSpeechKeysSaved: speechKeysSaved,
   };
   const selectedPlace = selected
     ? {

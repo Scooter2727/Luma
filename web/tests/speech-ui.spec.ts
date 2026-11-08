@@ -67,6 +67,9 @@ test("Luma voice is the voice, with the device voice only as a fallback", async 
 }) => {
   await boot(page, false);
   await openVoiceSettings(page);
+  await expect(page.getByRole("heading", { name: "AI voice keys" })).toHaveCount(0);
+  await expect(page.getByText("For local testing")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Save keys" })).toHaveCount(0);
   await expect(page.getByText("Try AI voice (experimental)")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Test voice", exact: true })).toHaveCount(0);
   await expect(page.locator(".voice-engine")).toHaveText(
@@ -211,76 +214,3 @@ test("Luma voice failure during preview falls back to the device voice wording",
     .toEqual([expect.stringMatching(/^Join the mapped pedestrian path/)]);
 });
 
-test("local key panel saves keys without reading them back and reports each service", async ({
-  page,
-}) => {
-  const saved: Record<string, string>[] = [];
-  let summary = {
-    available: false,
-    gemini: { saved: false, hint: "" },
-    elevenlabs: { saved: false, hint: "" },
-    voice_id: "JBFqnCBsd6RMkjVDRZzb",
-    default_voice_id: "JBFqnCBsd6RMkjVDRZzb",
-  };
-  await page.route("**/api/speech/keys", (r) => {
-    if (r.request().method() === "PUT") {
-      saved.push(r.request().postDataJSON());
-      summary = {
-        ...summary,
-        available: true,
-        gemini: { saved: true, hint: "…1234" },
-        elevenlabs: { saved: true, hint: "…5678" },
-      };
-    }
-    return r.fulfill({ json: summary });
-  });
-  await page.route("**/api/speech/keys/check", (r) =>
-    r.fulfill({
-      json: {
-        gemini: {
-          ok: true,
-          message: "Gemini key works with gemini-3.8-flash.",
-        },
-        elevenlabs: { ok: true, message: "ElevenLabs key and voice work." },
-      },
-    }),
-  );
-  let available = false;
-  await page.route("**/api/speech/status", (r) =>
-    r.fulfill({ json: { available } }),
-  );
-  await page.addInitScript(() => {});
-  await page.goto("/");
-  await finishOnboarding(page);
-  await openVoiceSettings(page);
-  const save = page.getByRole("button", { name: "Save keys" });
-  await expect(save).toBeDisabled();
-  await page.getByLabel("Google Gemini API key").fill("AQ.gemini-1234");
-  await page.getByLabel(/ElevenLabs API key/).fill("sk_eleven-5678");
-  available = true;
-  await save.click();
-  await expect(page.getByText("Both keys work. Press Test Luma voice.")).toBeVisible();
-  expect(saved).toEqual([
-    {
-      gemini_api_key: "AQ.gemini-1234",
-      elevenlabs_api_key: "sk_eleven-5678",
-      elevenlabs_voice_id: "",
-    },
-  ]);
-  await expect(page.getByLabel("Google Gemini API key")).toHaveValue("");
-  await expect(page.getByLabel("Google Gemini API key")).toHaveAttribute(
-    "placeholder",
-    "Saved (…1234). Paste to replace.",
-  );
-});
-
-test("the key panel is hidden when the server does not offer it", async ({
-  page,
-}) => {
-  await page.route("**/api/speech/keys", (r) =>
-    r.fulfill({ status: 404, json: { detail: "Not Found" } }),
-  );
-  await boot(page, false);
-  await openVoiceSettings(page);
-  await expect(page.getByRole("button", { name: "Save keys" })).toHaveCount(0);
-});

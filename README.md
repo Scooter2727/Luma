@@ -22,7 +22,7 @@ Run these in two terminals from this folder:
 npm run dev
 ```
 
-AI voice is optional. To enable it locally, open Settings → Voice → **AI voice keys**, paste the keys and press Save keys; Luma checks each key with one tiny request and reports what is wrong. Alternatively, copy `.env.example` to `.env` and fill in the backend-only variables below. The panel only exists on a local backend: `/api/speech/keys` answers 404 on Vercel and to requests from other machines, saves into `.env`, and only ever returns a masked hint of a saved key. The backend reads `.env` on startup and never sends these values to the browser. Without both API keys, AI voice stays hidden and Luma uses the device voice.
+AI voice is optional. To enable it locally, copy `.env.example` to `.env` and fill in the backend-only variables below (the file is gitignored). The backend reads `.env` on startup and never sends these values to the browser. Without both API keys, AI voice stays hidden and Luma uses the device voice.
 
 | Variable | Purpose | Default |
 | --- | --- | --- |
