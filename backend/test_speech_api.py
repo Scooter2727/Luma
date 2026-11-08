@@ -6,6 +6,11 @@ from backend import speech_audio
 
 client = TestClient(app)
 
+async def chunks(*parts):
+    for part in parts:
+        yield part
+
+
 
 def configure(monkeypatch):
     monkeypatch.setenv('GEMINI_API_KEY', 'gemini-test')
@@ -52,3 +57,20 @@ def test_synthesize_rejects_empty_or_oversized_text(monkeypatch, body):
     response = client.post('/api/speech/synthesize', json=body)
     assert response.status_code == 422
     assert response.json()['detail'].startswith('Invalid speech request.')
+
+
+def test_get_streams_audio_for_the_audio_element(monkeypatch, tmp_path):
+    configure(monkeypatch)
+    monkeypatch.setenv('LUMA_CACHE_DIR', str(tmp_path))
+    monkeypatch.setattr(speech_audio, 'TRANSPORT', httpx.MockTransport(
+        lambda request: httpx.Response(200, content=chunks(b'ID3', b'audio'), headers={'content-type': 'audio/mpeg'})))
+    response = client.get('/api/speech/synthesize', params={'text': 'Cross Queen Street West.'})
+    assert response.status_code == 200
+    assert response.headers['content-type'] == 'audio/mpeg'
+    assert response.content == b'ID3audio'
+    assert client.get('/api/speech/synthesize', params={'text': ' '}).status_code == 422
+    assert client.get('/api/speech/synthesize', params={'text': 'a' * 1001}).status_code == 422
+
+
+def test_get_is_unavailable_without_keys():
+    assert client.get('/api/speech/synthesize', params={'text': 'Hello.'}).status_code == 503

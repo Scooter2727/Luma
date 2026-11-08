@@ -6,6 +6,11 @@ from backend import speech_audio
 
 AUDIO = b'ID3fake-mpeg-audio'
 
+async def chunks(*parts):
+    for part in parts:
+        yield part
+
+
 
 @pytest.fixture
 def eleven(monkeypatch, tmp_path):
@@ -37,8 +42,8 @@ def test_cache_miss_calls_elevenlabs_and_writes_the_file(eleven, tmp_path):
     assert len(calls) == 1
     request = calls[0]
     assert request.headers['xi-api-key'] == 'test-key'
-    assert '/v1/text-to-speech/' in request.url.path
-    assert json.loads(request.content) == {'text': 'Cross Queen Street West.', 'model_id': 'eleven_turbo_v2_5'}
+    assert request.url.path.endswith('/stream') and request.url.params['output_format'] == 'mp3_44100_64'
+    assert json.loads(request.content) == {'text': 'Cross Queen Street West.', 'model_id': 'eleven_flash_v2_5'}
     files = list((tmp_path / 'speech-cache').glob('*.mp3'))
     assert len(files) == 1 and files[0].read_bytes() == AUDIO
     assert not list((tmp_path / 'speech-cache').glob('*.building'))
@@ -82,3 +87,25 @@ def test_missing_key_makes_no_network_call(eleven, monkeypatch):
     eleven(fail, key=None)
     monkeypatch.delenv('ELEVENLABS_API_KEY', raising=False)
     assert run() is None
+
+
+def test_stream_yields_chunks_and_caches_only_complete_audio(eleven, tmp_path):
+    eleven(lambda request: httpx.Response(200, content=chunks(b'ID3', b'part-two'), headers={'content-type': 'audio/mpeg'}))
+
+    async def collect():
+        stream = await speech_audio.synthesize_stream('Streaming.')
+        return [chunk async for chunk in stream]
+    assert b''.join(asyncio.run(collect())) == b'ID3part-two'
+    assert [f.read_bytes() for f in (tmp_path / 'speech-cache').glob('*.mp3')] == [b'ID3part-two']
+
+
+def test_abandoned_stream_is_not_cached(eleven, tmp_path):
+    eleven(lambda request: httpx.Response(200, content=chunks(b'ID3', b'rest'), headers={'content-type': 'audio/mpeg'}))
+
+    async def first_chunk_only():
+        stream = await speech_audio.synthesize_stream('Interrupted.')
+        chunk = await stream.__anext__()
+        await stream.aclose()
+        return chunk
+    assert asyncio.run(first_chunk_only()) == b'ID3'
+    assert not list(tmp_path.glob('speech-cache/*.mp3'))

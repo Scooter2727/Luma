@@ -6,7 +6,7 @@ from typing import Literal
 import networkx as nx
 from fastapi import FastAPI,HTTPException,Query
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse,Response
+from fastapi.responses import JSONResponse,StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from pydantic import BaseModel,Field,field_validator
@@ -110,12 +110,18 @@ class SpeechRequest(BaseModel):
         return value.strip()
 @app.get('/api/speech/status')
 def speech_status():return {'available':config.speech_configured()}
-@app.post('/api/speech/synthesize')
-async def synthesize_speech(req:SpeechRequest):
+async def stream_speech(text):
     if not config.speech_configured():raise HTTPException(503,SPEECH_UNAVAILABLE)
-    audio=await speech_audio.synthesize(req.text)
-    if audio is None:raise HTTPException(503,'AI voice could not be generated. Luma uses the device voice instead.')
-    return Response(audio,media_type='audio/mpeg',headers={'Cache-Control':'private, max-age=86400'})
+    stream=await speech_audio.synthesize_stream(text)
+    if stream is None:raise HTTPException(503,'AI voice could not be generated. Luma uses the device voice instead.')
+    return StreamingResponse(stream,media_type='audio/mpeg',headers={'Cache-Control':'private, max-age=86400'})
+@app.post('/api/speech/synthesize')
+async def synthesize_speech(req:SpeechRequest):return await stream_speech(req.text)
+@app.get('/api/speech/synthesize')
+async def synthesize_speech_url(text:str=Query(min_length=1,max_length=1000)):
+    """GET form so an audio element can start playing while the MP3 is still streaming."""
+    if not text.strip():raise HTTPException(422,'Invalid speech request. text: Enter text to speak.')
+    return await stream_speech(text.strip())
 @app.get('/api/transit/meta')
 def transit_meta():return {'service_start':feed_range()[0],'service_end':feed_range()[1],'timing':'scheduled','timezone':'America/Toronto','max_bus_transfers':1,'max_access_walk_metres':1000}
 def number_text(n):return str(int(n)) if float(n).is_integer() else str(n)
