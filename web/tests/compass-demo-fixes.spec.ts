@@ -82,3 +82,20 @@ test("interrupted Safari audio exposes retry and replaces the interrupted contex
   await page.getByRole("button", { name: "Back", exact: true }).click();
   expect(await page.evaluate(() => (navigator as any).audioSession.type)).toBe("auto");
 });
+
+test("cardinal letters stay within the dial through a full rotation", async ({ page }) => {
+  await demo(page);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  for (const heading of [0, 45, 90, 135, 180, 225, 270, 315, 359, 0]) {
+    await page.evaluate(value => { (window as any).testHeading = value; (window as any).publish(); }, heading);
+    await expect(page.locator(".compass-reading strong")).toHaveText(`${heading}°`);
+    const bounds = await page.locator(".compass-face svg").boundingBox();
+    for (const letter of await page.locator(".compass-cardinal").all()) {
+      const box = (await letter.boundingBox())!;
+      expect(box.x).toBeGreaterThan(bounds!.x);
+      expect(box.y).toBeGreaterThan(bounds!.y);
+      expect(box.x + box.width).toBeLessThan(bounds!.x + bounds!.width);
+      expect(box.y + box.height).toBeLessThan(bounds!.y + bounds!.height);
+    }
+  }
+});

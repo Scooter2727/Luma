@@ -260,6 +260,19 @@ h1:focus {
   flex-direction: column;
   gap: 14px;
 }
+.page-content {
+  display: flex;
+  flex-direction: column;
+  gap: inherit;
+  min-width: 0;
+}
+.panel.map-panel > .page-content {
+  flex: 1;
+  pointer-events: none;
+}
+.panel.map-panel > .page-content > * {
+  pointer-events: auto;
+}
 .page-header {
   display: flex;
   align-items: center;
@@ -1304,6 +1317,16 @@ h1:focus {
 .compass-fullscreen[data-demo-running="true"] .compass-face-status {
   top: calc(50% + min(39vw, 20dvh, 210px) + 24px);
   font-size: 20px;
+}
+.compass-fullscreen[data-demo-running="false"] .compass-demo-start {
+  background: var(--mint);
+  color: var(--mint-text);
+  border-color: var(--mint);
+}
+.compass-fullscreen[data-demo-running="true"] .compass-demo-start {
+  background: var(--accent);
+  color: #000;
+  border-color: var(--accent);
 }
 .compass-face[data-demo-state="off"] .compass-rim {
   stroke: var(--demo-off);

@@ -119,8 +119,8 @@ export default function CompassMode({
   const demoStatus = demo
     ? demo.state === "waiting"
       ? compassReason || compassWarning
-        ? sensorMessage(compassReason || compassWarning) || "Waiting for compass"
-        : "Waiting for compass"
+        ? sensorMessage(compassReason || compassWarning)
+        : ""
       : demo.state === "on"
         ? `On track · Hold ${Math.ceil((3000 - demo.heldMs) / 1000)} s`
         : `${targetLabels[demo.state]} · Turn phone ${turn}`
@@ -151,7 +151,7 @@ export default function CompassMode({
   const accessibleText =
     heading === null
       ? "Compass heading unavailable. " + (compassReason || result.reason)
-      : `Compass. ${heading} degrees ${direction}. ${northReference === "true" ? "True north" : "Magnetic north"}.${compassWarning ? " Approximate reading. " + sensorMessage(compassWarning) : ""}`;
+      : `Compass. ${heading} degrees ${direction}. ${northReference === "true" ? "True north." : ""}${compassWarning ? " Approximate reading. " + sensorMessage(compassWarning) : ""}`;
   const targetDescription = demo
     ? ` Demo target ${Math.round(demo.target)} degrees. ${demoStatus}.`
     : "";
@@ -253,10 +253,10 @@ export default function CompassMode({
               ))}
               {(
                 [
-                  ["N", 160, 72],
-                  ["E", 257, 171],
-                  ["S", 160, 270],
-                  ["W", 63, 171],
+                  ["N", 160, 74],
+                  ["E", 246, 160],
+                  ["S", 160, 246],
+                  ["W", 74, 160],
                 ] as const
               ).map(([name, x, y]) => (
                 <text
@@ -264,6 +264,7 @@ export default function CompassMode({
                   x={x}
                   y={y}
                   textAnchor="middle"
+                  dominantBaseline="central"
                   className={
                     name === "N" ? "compass-cardinal north" : "compass-cardinal"
                   }
@@ -292,15 +293,12 @@ export default function CompassMode({
           aria-atomic="true"
         >
           {demo ? (
-            <>
-              <span className="compass-demo-label">Pointing demo</span>
-              {demoStatus}
-            </>
+            demoStatus
           ) : heading === null ? (
             compassReason ? (
               sensorMessage(compassReason)
             ) : (
-              "Waiting for compass"
+              null
             )
           ) : compassWarning && sensorMessage(compassWarning) ? (
             sensorMessage(compassWarning)
@@ -308,14 +306,12 @@ export default function CompassMode({
             northReference === "true" ? (
               "True north"
             ) : (
-              "Magnetic north"
+              null
             )
           ) : (
             labels[result.state]
           )}
-          <span className="compass-road">
-            {road ? `Near ${road}` : "Road name unavailable"}
-          </span>
+          {road && <span className="compass-road">Near {road}</span>}
         </p>
       </div>
       {demo && (
@@ -337,13 +333,11 @@ export default function CompassMode({
             )}
             {targetGame.sound ? "Sound on" : "Sound off"}
           </button>
-          <p role="status">
+          {(targetGame.audioError || hapticsAvailable) && <p role="status">
             {targetGame.audioError
               ? "Tap Sound off to enable audio."
-              : !hapticsAvailable
-                ? "Beeps only · vibration unavailable"
-                : "Vibration on supported devices"}
-          </p>
+              : "Vibration on supported devices"}
+          </p>}
         </div>
       )}
     </section>,
