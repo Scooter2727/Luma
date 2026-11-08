@@ -2199,3 +2199,119 @@ h1:focus {
     font-size: 19px;
   }
 }
+.key-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  border: 3px solid var(--ink);
+  border-radius: 20px;
+  background: var(--surface);
+}
+.key-card h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 22px;
+}
+.key-note {
+  font-size: 16px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.key-card label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 18px;
+  font-weight: 700;
+}
+.key-card label small {
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.key-card input {
+  min-height: 56px;
+  margin-top: 4px;
+  padding: 0 14px;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  background: var(--soft);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 400;
+  font-size: 17px;
+}
+.key-card input:focus-visible {
+  border-color: var(--primary);
+  outline: 3px solid var(--tint);
+}
+.key-card details summary {
+  cursor: pointer;
+  font-size: 17px;
+  font-weight: 700;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+.key-card details label {
+  margin-top: 6px;
+}
+.key-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+.key-actions button {
+  min-height: 60px;
+  border-radius: 16px;
+  background: var(--primary);
+  color: var(--primary-text);
+  font-size: 19px;
+  font-weight: 700;
+}
+.key-actions button.secondary {
+  background: var(--surface);
+  color: var(--ink);
+  border: 3px solid var(--ink);
+}
+.key-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.key-results:empty {
+  display: none;
+}
+.key-results {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.key-result {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 16px;
+  line-height: 1.4;
+  word-break: break-word;
+}
+.key-result svg {
+  flex: none;
+  margin-top: 1px;
+}
+.key-result.ok {
+  background: #e7f8f1;
+  color: #064e3b;
+}
+.key-result.bad {
+  background: var(--warning-bg);
+  color: var(--warning-ink);
+  border: 2px solid var(--warning-border);
+}
+.key-next {
+  font-size: 17px;
+  font-weight: 700;
+}

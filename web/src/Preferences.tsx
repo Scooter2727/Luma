@@ -19,6 +19,7 @@ import {
 import { CrosswalkIcon } from "./Icons";
 import { logoForTheme } from "./brand";
 import type { Preferences } from "./model";
+import { SpeechKeys } from "./SpeechKeys";
 export type PreferenceProps = {
   prefs: Preferences;
   change: (values: Partial<Preferences>) => void;
@@ -28,6 +29,7 @@ export type PreferenceProps = {
   /** AI voice is configured and has not failed repeatedly this session. */
   aiVoiceReady?: boolean;
   testAiVoice?: (text: string) => void;
+  onSpeechKeysSaved?: () => void;
 };
 const SAMPLE_INSTRUCTION =
   "This is a sample Luma instruction. Turn right onto Queen Street West.";
@@ -447,6 +449,9 @@ export function Settings(
         <>
           <SpeedCard {...props} />
           <AiVoiceChoice {...props} />
+          {props.onSpeechKeysSaved && (
+            <SpeechKeys onSaved={props.onSpeechKeysSaved} />
+          )}
         </>
       )}{" "}
       {section === "directions" && <DirectionsChoices {...props} />}

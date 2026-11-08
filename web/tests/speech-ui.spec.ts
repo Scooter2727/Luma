@@ -33,7 +33,10 @@ async function boot(
     texts.push(new URL(r.request().url()).searchParams.get("text") || "");
     return synthesize === "audio"
       ? r.fulfill({ body: silentWav(), contentType: "audio/wav" })
-      : r.fulfill({ status: 503, json: { detail: "AI voice could not be generated." } });
+      : r.fulfill({
+          status: 503,
+          json: { detail: "AI voice could not be generated." },
+        });
   });
   await page.addInitScript((items) => {
     localStorage.setItem("luma-onboarding-complete", "true");
@@ -58,7 +61,9 @@ test("AI voice stays hidden and is explained when the server is not configured",
   await openVoiceSettings(page);
   await expect(page.getByRole("button", { name: "Test voice" })).toBeVisible();
   await expect(page.getByText("Try AI voice (experimental)")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Test AI voice" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Test AI voice" })).toHaveCount(
+    0,
+  );
   await expect(page.locator(".voice-engine")).toHaveText("Using device voice");
   await page.getByRole("button", { name: "Back to settings" }).click();
   await page.getByRole("button", { name: "Privacy", exact: true }).click();
@@ -142,7 +147,12 @@ test("routes prefetch the rephrased first steps so the preview starts without wa
   await page.route("**/api/speech/rephrase", (r) => {
     const steps = r.request().postDataJSON().steps as { text: string }[];
     rephrased.push(steps.length);
-    return r.fulfill({ json: { texts: steps.map((s) => "Natural. " + s.text), rephrased: steps.map(() => true) } });
+    return r.fulfill({
+      json: {
+        texts: steps.map((s) => "Natural. " + s.text),
+        rephrased: steps.map(() => true),
+      },
+    });
   });
   await recordDeviceSpeech(page);
   const texts = await boot(page, true, "audio", { "luma-ai-voice": "true" });
@@ -164,7 +174,9 @@ test("routes prefetch the rephrased first steps so the preview starts without wa
   expect(rephrased.length).toBeGreaterThan(0);
   // The first two steps were already downloaded, so the preview does not wait on the network.
   const early = texts.slice(0, beforePreview);
-  expect(texts.slice(beforePreview).filter((t) => early.includes(t))).toEqual([]);
+  expect(texts.slice(beforePreview).filter((t) => early.includes(t))).toEqual(
+    [],
+  );
   expect(texts).toEqual(
     expect.arrayContaining([
       expect.stringMatching(/^Natural\. Join the mapped pedestrian path/),
@@ -184,7 +196,12 @@ test("AI voice failure during preview falls back to the device voice wording", a
 }) => {
   await page.route("**/api/speech/rephrase", (r) => {
     const steps = r.request().postDataJSON().steps as { text: string }[];
-    return r.fulfill({ json: { texts: steps.map((s) => "Natural. " + s.text), rephrased: steps.map(() => true) } });
+    return r.fulfill({
+      json: {
+        texts: steps.map((s) => "Natural. " + s.text),
+        rephrased: steps.map(() => true),
+      },
+    });
   });
   await recordDeviceSpeech(page);
   await boot(page, true, "503", { "luma-ai-voice": "true" });
@@ -196,4 +213,86 @@ test("AI voice failure during preview falls back to the device voice wording", a
       ),
     )
     .toEqual([expect.stringMatching(/^Join the mapped pedestrian path/)]);
+});
+
+test("local key panel saves keys without reading them back and reports each service", async ({
+  page,
+}) => {
+  const saved: Record<string, string>[] = [];
+  let summary = {
+    available: false,
+    gemini: { saved: false, hint: "" },
+    elevenlabs: { saved: false, hint: "" },
+    voice_id: "JBFqnCBsd6RMkjVDRZzb",
+    default_voice_id: "JBFqnCBsd6RMkjVDRZzb",
+  };
+  await page.route("**/api/speech/keys", (r) => {
+    if (r.request().method() === "PUT") {
+      saved.push(r.request().postDataJSON());
+      summary = {
+        ...summary,
+        available: true,
+        gemini: { saved: true, hint: "…1234" },
+        elevenlabs: { saved: true, hint: "…5678" },
+      };
+    }
+    return r.fulfill({ json: summary });
+  });
+  await page.route("**/api/speech/keys/check", (r) =>
+    r.fulfill({
+      json: {
+        gemini: {
+          ok: true,
+          message: "Gemini key works with gemini-3.8-flash.",
+        },
+        elevenlabs: { ok: true, message: "ElevenLabs key and voice work." },
+      },
+    }),
+  );
+  let available = false;
+  await page.route("**/api/speech/status", (r) =>
+    r.fulfill({ json: { available } }),
+  );
+  await page.addInitScript(() =>
+    localStorage.setItem("luma-onboarding-complete", "true"),
+  );
+  await page.goto("/");
+  await page.getByRole("button", { name: "Try Luma", exact: true }).click();
+  await openVoiceSettings(page);
+  await expect(
+    page.getByRole("checkbox", { name: /Try AI voice/ }),
+  ).toHaveCount(0);
+  const save = page.getByRole("button", { name: "Save keys" });
+  await expect(save).toBeDisabled();
+  await page.getByLabel("Google Gemini API key").fill("AQ.gemini-1234");
+  await page.getByLabel(/ElevenLabs API key/).fill("sk_eleven-5678");
+  available = true;
+  await save.click();
+  await expect(page.getByText("Both keys work.")).toBeVisible();
+  expect(saved).toEqual([
+    {
+      gemini_api_key: "AQ.gemini-1234",
+      elevenlabs_api_key: "sk_eleven-5678",
+      elevenlabs_voice_id: "",
+    },
+  ]);
+  await expect(page.getByLabel("Google Gemini API key")).toHaveValue("");
+  await expect(page.getByLabel("Google Gemini API key")).toHaveAttribute(
+    "placeholder",
+    "Saved (…1234). Paste to replace.",
+  );
+  await expect(
+    page.getByRole("checkbox", { name: /Try AI voice/ }),
+  ).toBeVisible();
+});
+
+test("the key panel is hidden when the server does not offer it", async ({
+  page,
+}) => {
+  await page.route("**/api/speech/keys", (r) =>
+    r.fulfill({ status: 404, json: { detail: "Not Found" } }),
+  );
+  await boot(page, false);
+  await openVoiceSettings(page);
+  await expect(page.getByRole("button", { name: "Save keys" })).toHaveCount(0);
 });

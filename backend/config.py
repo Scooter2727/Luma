@@ -10,8 +10,13 @@ DEFAULT_ELEVENLABS_MODEL_ID = 'eleven_flash_v2_5'
 DEFAULT_ELEVENLABS_VOICE_ID = 'JBFqnCBsd6RMkjVDRZzb'
 
 
-def load_local_env(path=ROOT / '.env'):
+ENV_PATH = ROOT / '.env'
+EDITABLE_KEYS = ('GEMINI_API_KEY', 'ELEVENLABS_API_KEY', 'ELEVENLABS_VOICE_ID')
+
+
+def load_local_env(path=None):
     """Fill unset variables from a local .env file. Vercel injects its own Environment Variables."""
+    path = path or ENV_PATH
     if is_vercel() or not path.is_file():
         return
     for line in path.read_text(encoding='utf-8').splitlines():
@@ -48,6 +53,26 @@ def elevenlabs_model_id():
 
 def speech_configured():
     return bool(gemini_api_key() and elevenlabs_api_key())
+
+
+def save_local_env(values):
+    """Write keys into the local .env file, keeping its other lines, and apply them immediately."""
+    values = {k: v for k, v in values.items() if k in EDITABLE_KEYS}
+    lines = ENV_PATH.read_text(encoding='utf-8').splitlines() if ENV_PATH.is_file() else []
+    remaining = dict(values)
+    for i, line in enumerate(lines):
+        name = line.split('=', 1)[0].strip()
+        if '=' in line and not line.lstrip().startswith('#') and name in remaining:
+            lines[i] = f'{name}={remaining.pop(name)}'
+    lines += [f'{name}={value}' for name, value in remaining.items()]
+    temporary = ENV_PATH.with_suffix('.building')
+    temporary.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+    temporary.replace(ENV_PATH)
+    for name, value in values.items():
+        if value:
+            os.environ[name] = value
+        else:
+            os.environ.pop(name, None)
 
 
 load_local_env()

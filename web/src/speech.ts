@@ -44,6 +44,14 @@ export function loadSpeechStatus(): Promise<boolean> {
 export function aiSpeechAvailable() {
   return status === true && failures < FAILURE_LIMIT;
 }
+/** Ask the server again, for example after keys were saved, and clear past failures. */
+export function refreshSpeechStatus(): Promise<boolean> {
+  status = null;
+  statusRequest = null;
+  failures = 0;
+  blobs.clear();
+  return loadSpeechStatus();
+}
 /** Clear the failure count, for example when the user explicitly tests AI voice again. */
 export function resetAiSpeechSession() {
   failures = 0;
