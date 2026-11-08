@@ -32,6 +32,7 @@ export type Route = {
     title: string;
     kind: string;
     scheduled_time?: string;
+    timing?: "real-time" | "scheduled";
     coordinates: Coord;
     distance: number;
     crossing: boolean;
@@ -44,11 +45,17 @@ export type Route = {
   }[];
   ai_directions?: Preferences["directions"];
   snap_distances: number[];
-  mode: "walk" | "bus";
+  mode: "walk" | "bus" | "transit";
   departure_time: string;
   arrival_time: string;
   duration_seconds: number;
-  timing: "estimated" | "scheduled";
+  timing: "estimated" | "scheduled" | "real-time" | "mixed";
+  construction_revision?: string;
+  construction_available?: boolean;
+  construction_complete?: boolean;
+  construction_stale?: boolean;
+  transit_stale?: boolean;
+  pednet_ids?: string[];
   explanation: string;
   tactile: number;
   walking_minutes?: number;
@@ -56,20 +63,31 @@ export type Route = {
   waiting_minutes?: number;
   transfers?: number;
   segments: {
-    mode: "walk" | "bus" | "connect";
+    mode: "walk" | "bus" | "streetcar" | "subway" | "connect";
     coordinates: Coord[];
     route?: string;
   }[];
   bus_legs?: {
+    mode?: "bus" | "streetcar" | "subway";
     route: string;
+    route_id?: string;
+    direction_id?: string;
+    from_stop?: string;
+    to_stop?: string;
     headsign: string;
     from_name: string;
     to_name: string;
     departure_time: string;
     arrival_time: string;
+    timing?: "real-time" | "scheduled" | "mixed";
     stops: number;
   }[];
 };
+export type ConstructionData = GeoJSON.FeatureCollection<GeoJSON.Geometry, {
+  id: string; name: string; street: string; description: string;
+  pedestrian_access: "closed" | "open" | "unknown";
+  routing_status: string; active: boolean; source_url: string; closed_pednet_ids?: string[];
+}> & { revision: string; available: boolean; stale: boolean; complete: boolean };
 export const kinds = [
   {
     id: "signal",

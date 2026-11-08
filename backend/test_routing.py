@@ -103,12 +103,12 @@ def test_slower_speed_changes_physical_time():
 def test_bus_journey_matches_feed_and_includes_complete_walking_legs():
     routes=get_routes(end=[-79.3948,43.6677],end_name='Royal Ontario Museum',mode='bus')
     bus=routes[0]
-    assert bus['mode']=='bus' and bus['timing']=='scheduled'
+    assert bus['mode']=='transit' and bus['timing']=='scheduled'
     assert any(r['mode']=='walk' for r in routes)
     assert 0<=bus['transfers']<=1
     assert bus['walking_minutes']>0 and bus['waiting_minutes']>=1
     assert {'wait','board','ride','alight','arrive'}.issubset({s['kind'] for s in bus['steps']})
-    assert any(s['mode']=='bus' and len(s['coordinates'])>3 for s in bus['segments'])
+    assert any(s['mode'] in ('bus','streetcar','subway') and len(s['coordinates'])>3 for s in bus['segments'])
     previous=datetime.fromisoformat(bus['departure_time'])
     db=sqlite3.connect(database());db.row_factory=sqlite3.Row
     for leg in bus['bus_legs']:
@@ -138,7 +138,8 @@ def test_service_calendar_and_midnight_times():
 
 @pytest.mark.parametrize('hour',[12,24])
 @pytest.mark.parametrize('miss_transfer',[False,True])
-def test_same_stop_transfer_buffer_and_overnight_service(tmp_path,monkeypatch,hour,miss_transfer):
+@pytest.mark.parametrize('live_delay',[0,60,300])
+def test_same_stop_transfer_buffer_and_overnight_service(tmp_path,monkeypatch,hour,miss_transfer,live_delay):
     from types import SimpleNamespace
     from backend import transit
     path=tmp_path/'schedule.sqlite'
@@ -149,6 +150,7 @@ def test_same_stop_transfer_buffer_and_overnight_service(tmp_path,monkeypatch,ho
     db.executemany('INSERT INTO times VALUES(?,?,?,?,?,?,?)',[
         ('t1','a',1,base+300,base+300,0,0),('t1','b',2,base+900,base+900,0,0),
         ('t2','b',1,second_departure,second_departure,0,0),('t2','c',2,base+1620,base+1620,0,0)])
+    db.execute("ALTER TABLE trips ADD COLUMN direction TEXT DEFAULT '0'")
     db.commit();db.close()
     nodes={'a':(-79.38,43.65),'b':(-79.35,43.67),'c':(-79.32,43.69)}
     g=nx.Graph();g.add_nodes_from(nodes.values())
@@ -158,14 +160,24 @@ def test_same_stop_transfer_buffer_and_overnight_service(tmp_path,monkeypatch,ho
     monkeypatch.setattr(transit,'active_services',lambda d:{'s'} if d==date(2026,11,7) else set())
     monkeypatch.setattr(transit,'route_metadata',lambda:{str(i):{'route_short_name':str(i)} for i in [1,2]})
     depart=datetime(2026,11,7,12 if hour==12 else 23,0 if hour==12 else 55,tzinfo=TZ)
+    if live_delay:
+        class Clock(datetime):
+            @classmethod
+            def now(cls,tz=None):return depart
+        monkeypatch.setattr(transit,'datetime',Clock)
+        live=dict(available=True,timestamp=depart.timestamp(),vehicles={},updates={'t1':[dict(
+            trip_id='t1',route_id='1',direction_id='0',start_date='20261107',relationship=0,delay=None,
+            stops=[dict(seq=2,stop_id='b',relationship=0,arrival={'delay':live_delay},departure={})])]})
+        monkeypatch.setattr(transit.realtime,'snapshot',lambda:live)
     result=transit.bus_journeys(net,g,(nodes['a'],nodes['c']),nodes['a'],nodes['c'],depart,1.2,dict(audible=False,fewer=False,tactile=False))
-    if miss_transfer:assert not result
+    if miss_transfer or live_delay>=300:assert not result
     else:
         assert result[0]['transfers']==1
         assert [l['route'] for l in result[0]['bus_legs']]==['1','2']
         arrival=datetime.fromisoformat(result[0]['arrival_time'])
         assert arrival==datetime.fromisoformat(iso_at(date(2026,11,7),base+1620))
         assert result[0]['duration_seconds']==int(arrival.timestamp()-depart.timestamp())
+        if live_delay:assert result[0]['timing']=='mixed'
 
 def test_gtfs_service_anchor_spans_daylight_saving_change():
     from backend.transit import service_epoch

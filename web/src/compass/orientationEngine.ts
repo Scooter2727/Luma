@@ -134,7 +134,7 @@ export function matchRoute(route: Route, fix: Fix): Match {
     );
   if (edge.mode !== "walk")
     return result(
-      edge.mode === "bus"
+      ["bus", "streetcar", "subway"].includes(edge.mode)
         ? "Compass guidance is paused on the transit leg."
         : "This approach is not mapped precisely enough for compass guidance.",
     );

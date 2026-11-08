@@ -74,9 +74,11 @@ export function symbolInk(hex: string) {
 export async function mapIconImages(theme: string) {
   const palette = mapPalette(theme);
   return Promise.all(
-    kinds.map(async (kind) => {
-      const fill = palette.colors[kind.id];
-      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 40 40"><circle cx="20" cy="21" r="18" fill="#17212f" opacity=".12"/><circle cx="20" cy="19" r="17" fill="white" stroke="${palette.outline}" stroke-width="1.2"/><circle cx="20" cy="19" r="14" fill="${fill}"/><g transform="translate(8 7)" fill="none" stroke="${symbolInk(fill)}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${icons[kind.id]}</g></svg>`;
+    [...kinds, { id: "construction" }].map(async (kind) => {
+      const fill = kind.id === "construction" ? (theme === "contrast" ? "#FFD600" : theme === "red-green" ? "#E69F00" : theme === "blue-yellow" ? "#F0F0EB" : "#FF8A4C") : palette.colors[kind.id];
+      const svg = kind.id === "construction"
+        ? `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 40 40"><path d="M20 3L38 36H2Z" fill="${fill}" stroke="#17212F" stroke-width="2" stroke-linejoin="round"/><path d="M20 14v10m0 5v1" stroke="${symbolInk(fill)}" stroke-width="3" stroke-linecap="round"/></svg>`
+        : `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 40 40"><circle cx="20" cy="21" r="18" fill="#17212f" opacity=".12"/><circle cx="20" cy="19" r="17" fill="white" stroke="${palette.outline}" stroke-width="1.2"/><circle cx="20" cy="19" r="14" fill="${fill}"/><g transform="translate(8 7)" fill="none" stroke="${symbolInk(fill)}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${icons[kind.id]}</g></svg>`;
       const image = new Image();
       image.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
       await image.decode();

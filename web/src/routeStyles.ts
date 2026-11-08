@@ -3,8 +3,8 @@ import type { Route } from "./model";
 // Assign styles once per response so selection never changes a route's identity.
 export function withRouteStyles(routes: Route[]): Route[] {
   const options = routes.slice(0, 3);
-  let accessible = options.findIndex(r => /accessibility preferences|accessible route/i.test(r.name));
-  let fastest = options.findIndex(r => /fastest|earliest bus/i.test(r.name));
+  let accessible = options.findIndex(r => /accessibility preferences|accessible route|preferred (?:ttc|bus) journey/i.test(r.name));
+  let fastest = options.findIndex(r => /fastest|earliest (?:bus|ttc)/i.test(r.name));
   const coverage = (r: Route) => r.crossings ? (r.audible + r.tactile) / r.crossings : 2;
   if (accessible < 0) {
     // Compare documented crossing coverage when no preference route is named.

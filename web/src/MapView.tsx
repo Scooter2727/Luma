@@ -3,7 +3,7 @@ import * as maplibregl from "maplibre-gl";
 import mapWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { mapIconImages } from "./mapTheme";
-import type { Coord, Feature, Route, Place, Step } from "./model";
+import type { Coord, Feature, Route, Place, Step, ConstructionData } from "./model";
 import { routeColors, routeFeatures } from "./routeStyles";
 import { symbolInk } from "./mapTheme";
 maplibregl.setWorkerUrl(mapWorkerUrl);
@@ -11,6 +11,7 @@ type Props = {
   decorative?: boolean;
   theme: string;
   data: Feature[];
+  construction?: ConstructionData | null;
   active: string[];
   route?: Route;
   alternatives?: Route[];
@@ -26,6 +27,7 @@ export default function MapView({
   decorative = false,
   theme,
   data,
+  construction,
   active,
   route,
   alternatives,
@@ -41,6 +43,7 @@ export default function MapView({
     map = useRef<maplibregl.Map | null>(null),
     markers = useRef<maplibregl.Marker[]>([]);
   const [mapReady, setMapReady] = useState(false);
+  const [mapSize, setMapSize] = useState({ width: 0, height: 0 });
   const [hoveredRoute, setHoveredRoute] = useState<number | null>(null);
   const pickModeRef = useRef(pickMode);
   const themeRef = useRef(theme);
@@ -79,6 +82,25 @@ export default function MapView({
       if (disposed) return;
       for (const { id, image } of images)
         m.addImage(id, image, { pixelRatio: 2 });
+      m.addSource("construction", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+      m.addSource("construction-markers", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+      m.addLayer({
+        id: "construction-areas", type: "line", source: "construction", minzoom: 13,
+        filter: ["==", ["geometry-type"], "LineString"],
+        paint: { "line-color": ["case", ["==", ["get", "routing_status"], "blocked"], "#17212F", "#737C86"], "line-width": 3, "line-dasharray": [1.5, 2], "line-opacity": .65 },
+      });
+      m.addLayer({
+        id: "construction-points", type: "symbol", source: "construction-markers", minzoom: 14,
+        layout: { "icon-image": "construction", "icon-size": .85, "icon-allow-overlap": false, "icon-padding": 5 },
+      });
+      m.on("click", "construction-points", e => {
+        if (pickModeRef.current || m.queryRenderedFeatures(e.point, { layers: ["route-line", "route-secondary", "route-third"] }).length) return;
+        const f = e.features?.[0]; if (!f) return;
+        selectedRef.current({
+          type: "Feature", geometry: { type: "Point", coordinates: (f.geometry as GeoJSON.Point).coordinates as Coord },
+          properties: { id: f.properties.id, name: f.properties.name, kind: "construction", source_url: f.properties.source_url, address_or_position: f.properties.street },
+        });
+      });
       m.addSource("locations", {
         type: "geojson",
         data: { type: "FeatureCollection", features: [] },
@@ -278,6 +300,18 @@ export default function MapView({
 
   useEffect(() => {
     if (!mapReady || !map.current) return;
+    const features = (construction?.features || []).map(f => ({ ...f, properties: { ...f.properties, feed_stale: !!construction?.stale || !construction?.available } }));
+    (map.current.getSource("construction") as maplibregl.GeoJSONSource).setData({ type: "FeatureCollection", features });
+    const points: GeoJSON.Feature<GeoJSON.Point>[] = features.flatMap(f => {
+      const geometry = f.geometry;
+      const coordinates = geometry.type === "Point" ? geometry.coordinates : geometry.type === "LineString" ? geometry.coordinates[Math.floor(geometry.coordinates.length / 2)] : null;
+      return coordinates ? [{ type: "Feature", properties: f.properties, geometry: { type: "Point", coordinates } }] : [];
+    });
+    (map.current.getSource("construction-markers") as maplibregl.GeoJSONSource).setData({ type: "FeatureCollection", features: points });
+  }, [construction, mapReady]);
+
+  useEffect(() => {
+    if (!mapReady || !map.current) return;
     const m = map.current;
     (m.getSource("route") as maplibregl.GeoJSONSource).setData(
       routeFeatures(displayRoutes, alternatives ? (hoveredRoute ?? selectedIndex) : 0),
@@ -309,7 +343,7 @@ export default function MapView({
   useEffect(() => { setHoveredRoute(null); }, [selectedIndex, alternatives === undefined]);
   useEffect(() => {
     const m = map.current;
-    if (m && mapReady && displayRoutes.length) {
+    if (m && mapReady && displayRoutes.length && mapSize.width && mapSize.height) {
       const b = new maplibregl.LngLatBounds();
       displayRoutes.forEach((r) => r.coordinates.forEach((c) => b.extend(c)));
       m.fitBounds(b, {
@@ -318,14 +352,14 @@ export default function MapView({
             ? { top: 70, bottom: 70, left: 500, right: 60 }
             : {
                 top: 90,
-                bottom: alternatives ? window.innerHeight * 0.54 + 20 : 130,
+                bottom: 130,
                 left: 35,
                 right: 35,
               },
         maxZoom: 16,
       });
     }
-  }, [cameraKey, mapReady, visible]);
+  }, [cameraKey, mapReady, visible, mapSize]);
 
   useEffect(() => {
     if (!mapReady || !map.current || !focus) return;
@@ -334,7 +368,11 @@ export default function MapView({
   }, [focus, mapReady]);
   useEffect(() => {
     if (!container.current) return;
-    const observer = new ResizeObserver(() => map.current?.resize());
+    const observer = new ResizeObserver(([entry]) => {
+      map.current?.resize();
+      const { width, height } = entry.contentRect;
+      setMapSize(previous => previous.width === width && previous.height === height ? previous : { width, height });
+    });
     observer.observe(container.current);
     return () => observer.disconnect();
   }, []);

@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import MapView from "./MapView";
 import { withRouteStyles } from "./routeStyles";
+import { useConstruction } from "./useConstruction";
 import Hero from "./Hero";
 import CompassMode from "./compass/CompassMode";
 import { requestCompassAccess } from "./compass/sensors";
@@ -23,6 +24,7 @@ import HomeView from "./HomeView";
 import { JourneyPlanner, RouteChoices } from "./JourneyPlanner";
 import { Onboarding, Settings } from "./Preferences";
 import NavigationView from "./NavigationView";
+import TransitArrivals from "./TransitArrivals";
 import { logoForTheme } from "./brand";
 import ReportView, { ReportHistory } from "./ReportView";
 import type { LocatedPlace } from "./ReportView";
@@ -144,7 +146,7 @@ export default function App() {
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [notice, setNotice] = useState("");
-  const [mode, setMode] = useState<"walk" | "bus">("walk"),
+  const [mode, setMode] = useState<"walk" | "transit">("walk"),
     [departure, setDeparture] = useState(""),
     [timetable, setTimetable] = useState<{
       service_start: string;
@@ -166,6 +168,8 @@ export default function App() {
     [lastTrip, setLastTrip] = useState<Place | null>(() =>
       saved("last-trip", null),
     );
+  const conditions = useConstruction(!showHero && !onboarding, showOptions ? departure : "");
+  const refreshingRoutes = useRef(false);
   const requestNumber = useRef(0),
     lastPlanned = useRef("");
   const routeAbort = useRef<AbortController | null>(null);
@@ -338,6 +342,24 @@ export default function App() {
     });
     return () => cancelAnimationFrame(id);
   }, [view, showOptions, showHero, onboarding]);
+  useEffect(() => {
+    if (!comparingRoutes || mode !== "transit" || (departure && new Date(departure).getTime() > Date.now() + 7200000)) return;
+    const refresh = () => { if (!document.hidden) void plan(undefined, start, true); };
+    const timer = window.setInterval(refresh, 30000);
+    document.addEventListener("visibilitychange", refresh);
+    return () => { clearInterval(timer); document.removeEventListener("visibilitychange", refresh); };
+  }, [comparingRoutes, mode, planningKey, routeIndex]);
+  useEffect(() => {
+    if (!conditions?.available || !route?.construction_revision || conditions.revision === route.construction_revision) return;
+    if (comparingRoutes) { void plan(undefined, start, true); return; }
+    if (view === "navigate" && currentStep) {
+      const blocked = new Set(conditions.features.flatMap(f => f.properties.closed_pednet_ids || []));
+      if (!route.pednet_ids?.some(id => blocked.has(id))) return;
+      const origin: Place = { id: "detour", name: "Current route position", subtitle: "Route position", coordinates: currentStep.coordinates };
+      cancelAllSpeech(); setPlaying(false); setStart(origin); setStartValid(true);
+      void plan(undefined, origin);
+    }
+  }, [conditions?.revision, comparingRoutes, view]);
   // View changes end dictation. Closing the hero does not, so Ask Luma can start it.
   useEffect(() => {
     if (onboarding || showHero) return;
@@ -516,28 +538,33 @@ export default function App() {
     setShowOptions(false);
     setError("");
   }
-  async function plan(destination?: Place, origin: Place = start) {
+  async function plan(destination?: Place, origin: Place = start, background = false) {
+    if (background && refreshingRoutes.current) return;
+    const previousRoute = routes[routeIndex];
     const target = destination || end;
     if (!startValid || (!destination && !endValid)) {
       setError("Choose a search suggestion or map point for both locations.");
       return;
     }
+    refreshingRoutes.current = background;
     const number = ++requestNumber.current,
       key = keyFor(target, origin);
     routeAbort.current?.abort();
     const controller = new AbortController();
     routeAbort.current = controller;
     lastPlanned.current = key;
-    setEnd(target);
-    setEndValid(true);
-    setView("routes");
-    setShowOptions(true);
-    setSelected(null);
-    setPickMode(null);
-    setPlaying(false);
-    setBusy(true);
-    setError("");
-    setRoutes([]);
+    if (!background) {
+      setEnd(target);
+      setEndValid(true);
+      setView("routes");
+      setShowOptions(true);
+      setSelected(null);
+      setPickMode(null);
+      setPlaying(false);
+      setBusy(true);
+      setError("");
+      setRoutes([]);
+    }
     try {
       const d = await request<{ routes: Route[] }>("/api/routes", {
         signal: controller.signal,
@@ -559,16 +586,20 @@ export default function App() {
       });
       if (number !== requestNumber.current || key !== currentKey.current)
         return;
-      setRoutes(withRouteStyles(d.routes));
-      setRouteIndex(0);
-      setStep(0);
-      setNotice(d.routes.length + " route options found.");
-      if (!prefs.screenReader && aiSpeechAvailable())
+      const options = withRouteStyles(d.routes);
+      setRoutes(options);
+      setRouteIndex(background ? Math.max(0, options.findIndex(r => r.style_rank === previousRoute?.style_rank && r.mode === previousRoute?.mode)) : 0);
+      if (!background) { setStep(0); setNotice(d.routes.length + " route options found."); }
+      if (!background && !prefs.screenReader && aiSpeechAvailable())
         for (const r of d.routes) void rephraseRoute(r, number);
     } catch (e) {
-      if (number === requestNumber.current) setError((e as Error).message);
+      if (number === requestNumber.current && !controller.signal.aborted) {
+        if (background) setRoutes(previous => previous.map(r => ({ ...r, transit_stale: true })));
+        else setError((e as Error).message);
+      }
     } finally {
-      if (number === requestNumber.current) setBusy(false);
+      refreshingRoutes.current = false;
+      if (number === requestNumber.current && !background) setBusy(false);
     }
   }
   /** Replace ai_text with Gemini wording in the background; route planning never waits for it. */
@@ -710,6 +741,7 @@ export default function App() {
             decorative={onboarding || showHero}
             theme={prefs.theme}
             data={data}
+            construction={conditions}
             active={active}
             route={route}
             alternatives={comparingRoutes ? routes : undefined}
@@ -734,7 +766,7 @@ export default function App() {
               if (view !== "map") showMap(view);
             }}
             focus={view === "navigate" ? currentStep : camera}
-            visible={view === "map" || comparingRoutes}
+            visible={view === "map"}
           />
           {onboarding ? (
             <div className="setup-shell">
@@ -750,7 +782,6 @@ export default function App() {
               className={
                 "panel " +
                 (view === "routes" && showOptions ? "focused-panel " : "") +
-                (view === "routes" && comparingRoutes ? "comparison-panel " : "") +
                 (view === "map" ? "map-panel" : "") +
                 (view === "navigate" ? " navigation-panel" : "")
               }
@@ -835,6 +866,7 @@ export default function App() {
               {view === "routes" &&
                 (showOptions ? (
                   <RouteChoices
+                    construction={conditions}
                     routes={routes}
                     index={routeIndex}
                     setIndex={selectRoute}
@@ -976,17 +1008,21 @@ export default function App() {
                         <X />
                       </button>
                       <h1 tabIndex={-1}>{selected.properties.name}</h1>
-                      <p>{selected.properties.purpose}</p>
-                      <p className="helper">
-                        {selected.properties.location_precision}
-                      </p>
+                      {selected.properties.kind === "transit" && <TransitArrivals compact coordinates={selectedPlace.coordinates} />}
                       <button
                         className="dark-button"
                         onClick={() => void plan(selectedPlace)}
                       >
-                        Directions here
+                        Directions
                         <ArrowRight />
                       </button>
+                      <a
+                        href={selected.properties.source_url}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Source <ExternalLink size={18} />
+                      </a>
                       <button
                         className="outline-button"
                         onClick={() => {
@@ -1001,13 +1037,6 @@ export default function App() {
                         <Flag />
                         Report an issue here
                       </button>
-                      <a
-                        href={selected.properties.source_url}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        View data source <ExternalLink size={18} />
-                      </a>
                     </div>
                   ) : !pickMode && !comparingRoutes ? (
                     <details className="map-filters">

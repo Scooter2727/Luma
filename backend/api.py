@@ -11,7 +11,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from pydantic import BaseModel,Field,field_validator
 from .walking import network,distance,walk_details,weight,ROOT
-from .transit import TZ,bus_journeys,feed_range
+from .transit import TZ,bus_journeys,feed_range,upcoming_arrivals,stop_metadata
+from . import construction
 from .reports import router as reports_router
 from . import config,speech_audio,speech_keys,speech_phrasing
 
@@ -78,7 +79,7 @@ class RouteRequest(BaseModel):
     fewer_crossings:bool=False
     prefer_tactile:bool=False
     walking_speed:float=Field(1.2,ge=.5,le=2)
-    mode:Literal['walk','bus']='walk'
+    mode:Literal['walk','transit','bus']='walk'
     departure_time:datetime|None=None
     directions:Literal['clock','left-right','cardinal']='left-right'
     @field_validator('start','end')
@@ -123,8 +124,25 @@ async def synthesize_speech_url(text:str=Query(min_length=1,max_length=1000)):
     """GET form so an audio element can start playing while the MP3 is still streaming."""
     if not text.strip():raise HTTPException(422,'Invalid speech request. text: Enter text to speak.')
     return await stream_speech(text.strip())
+@app.get('/api/conditions')
+def conditions(at:datetime|None=None):
+    when=at.replace(tzinfo=TZ) if at and at.tzinfo is None else at
+    return construction.public_snapshot(construction.snapshot(network(),when))
+
 @app.get('/api/transit/meta')
-def transit_meta():return {'service_start':feed_range()[0],'service_end':feed_range()[1],'timing':'scheduled','timezone':'America/Toronto','max_bus_transfers':1,'max_access_walk_metres':1000}
+def transit_meta():return {'service_start':feed_range()[0],'service_end':feed_range()[1],'timing':'live-when-available','timezone':'America/Toronto','max_transfers':1,'max_access_walk_metres':1000,'modes':['bus','streetcar','subway']}
+
+@app.get('/api/transit/arrivals')
+def transit_arrivals(stop_id:list[str]=Query(default=[]),longitude:float|None=Query(None,ge=-180,le=180),latitude:float|None=Query(None,ge=-90,le=90),at:datetime|None=None):
+    ids=list(dict.fromkeys(stop_id))[:4]
+    if not ids and longitude is not None and latitude is not None:
+        nearby=[]
+        for sid,s in stop_metadata().items():
+            metres=distance((longitude,latitude),(float(s['stop_lon']),float(s['stop_lat'])))
+            if metres<=45:nearby.append((metres,sid))
+        ids=[sid for _,sid in sorted(nearby)[:3]]
+    return upcoming_arrivals(ids, at.replace(tzinfo=TZ) if at and at.tzinfo is None else at)
+
 COMPASS_POINTS=('north','northeast','east','southeast','south','southwest','west','northwest')
 def number_text(n):return str(int(n)) if float(n).is_integer() else str(n)
 def instruction_text(step,previous,style):
@@ -187,15 +205,17 @@ def plan_routes(req:RouteRequest):
     depart=departure(req);net=network()
     try:g,(a,b),offsets=net.query_graph(req.start,req.end)
     except ValueError as e:raise HTTPException(422,str(e))
+    conditions=construction.snapshot(net,depart)
+    construction.apply_closures(g,conditions)
     prefs=dict(audible=req.prefer_audible,fewer=req.fewer_crossings,tactile=req.prefer_tactile);preferred=any(prefs.values())
-    if req.mode=='bus':
+    if req.mode in ('bus','transit'):
         try:results=bus_journeys(net,g,(a,b),req.start,req.end,depart,req.walking_speed,prefs)
         except ValueError as e:raise HTTPException(422,str(e))
-        if not results:raise HTTPException(422,'No scheduled bus journey found within 3 hours, with up to one same-stop transfer and walks of up to 1 km at either end. Try another departure time or walking mode.')
+        if not results:raise HTTPException(422,'No TTC journey found within 3 hours, with up to one transfer and walks of up to 1 km at either end. Try another departure time or walking mode.')
         for i,r in enumerate(results):
-            r['id']=str(i);r['name']=('Preferred bus journey' if preferred else 'Earliest bus arrival') if i==0 else 'Bus alternative'
+            r['id']=str(i);r['name']=('Preferred TTC journey' if preferred else 'Earliest TTC arrival') if i==0 else 'Alternative TTC journey'
             r['steps'].append(dict(kind='arrive',title=f'Arrive near {req.end_name}',text=f'Arrive near {req.end_name}. Confirm the entrance.',distance=0,coordinates=list(req.end),crossing=False))
-            r['explanation']='Includes walking, waiting, and a 60-second boarding or transfer buffer.'+(' Your crossing preferences apply to both walking legs.' if preferred else ' Earliest scheduled arrival for this bus option.')
+            r['explanation']='Includes walking, expected waiting, TTC travel, and boarding/transfer time. Subway times are scheduled.'+(' Your crossing preferences apply to both walking legs.' if preferred else ' Earliest estimated arrival for this TTC option.')
         # Give users useful context when walking is quicker than waiting for a bus.
         try:
             path=nx.astar_path(g,a,b,heuristic=lambda x,y:distance(x,y)/req.walking_speed,weight=weight(req.walking_speed,**prefs))
@@ -221,4 +241,9 @@ def plan_routes(req:RouteRequest):
             r['explanation']=('Prioritizes '+', '.join(label for enabled,label in [(req.prefer_audible,'listed audible signals'),(req.fewer_crossings,'fewer crossings'),(req.prefer_tactile,'mapped tactile paving')] if enabled)+'. '+('The fastest path already meets this preference balance.' if selected==fastest else f"Adds about {r['extra_minutes']} minutes compared with the fastest walk.")) if preferred and r['id']=='0' else 'Shortest estimated walking time, including a 20-second allowance per mapped crossing.'
     for alternative in results:
         if req.mode=='walk' and alternative['name']=='Alternative walking route':alternative['explanation']='A distinct mapped pedestrian path. Crossing preferences influence this option.' if preferred else 'A distinct mapped pedestrian path with its own estimated walking time.'
-    return {'routes':results[:3],'notice':'Accessibility routes prioritize documented features; they are not a guarantee of safety. Listed audible signals are assumed to cover all directions for this prototype.','preferences_applied':preferred,'timezone':'America/Toronto'}
+    for result in results:
+        result['construction_revision']=conditions['revision']
+        result['construction_available']=conditions['available']
+        result['construction_complete']=conditions['complete']
+        result['construction_stale']=conditions['stale']
+    return {'construction':{k:conditions[k] for k in ('revision','available','complete','stale','fetched_at')},'routes':results[:3],'notice':'Accessibility routes prioritize documented features; they are not a guarantee of safety. Listed audible signals are assumed to cover all directions for this prototype.','preferences_applied':preferred,'timezone':'America/Toronto'}

@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import CompassMode from "./compass/CompassMode";
+import TransitArrivals from "./TransitArrivals";
 import { requestCompassAccess } from "./compass/sensors";
 import { isDesktopDevice } from "./compass/device";
 import {
@@ -57,7 +58,7 @@ export default function NavigationView({
     prefs.directions === "left-right" ? s.title : text.split(". ")[0];
   const isBus = ["wait", "board", "ride", "alight"].includes(s.kind);
   const distanceLabel = s.scheduled_time
-    ? timeLabel(s.scheduled_time) + " scheduled"
+    ? timeLabel(s.scheduled_time) + (s.timing === "real-time" ? " predicted" : " scheduled")
     : s.distance > 0
       ? s.distance + " m"
       : s.kind === "arrive"
@@ -129,6 +130,7 @@ export default function NavigationView({
               <span className="instruction-summary">{summary}</span>
             </span>
           </div>
+          {s.kind === "wait" && <TransitArrivals legs={route.bus_legs?.filter(l => l.departure_time === s.scheduled_time)} />}
           <div
             className="navigation-controls"
             role="group"

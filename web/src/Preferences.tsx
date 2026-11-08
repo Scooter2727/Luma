@@ -478,6 +478,11 @@ export function Settings(
               </a>
               .
             </p>
+            <p>
+              Construction and TTC schedules, trip updates, and vehicle positions
+              contain information licensed under the Open Government Licence – Toronto.
+              Surface predictions are live when available; subway times use schedules.
+            </p>
           </details>
         </>
       )}

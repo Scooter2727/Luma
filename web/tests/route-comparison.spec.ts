@@ -107,6 +107,14 @@ for (const count of [1, 2, 3])
         .click();
       await expect(page.getByRole("heading", { name: `Route 1 of ${count}`, exact: true })).toBeVisible();
       await expect(page.locator(".route-comparison")).toHaveCount(0);
+      if (width <= 760) {
+        await expect(page.locator(".map-shell")).toBeHidden();
+        const panel = await page.locator(".panel").boundingBox();
+        expect(panel?.y).toBe(0);
+        expect(panel?.height).toBe(900);
+      } else {
+        await expect(page.locator(".map-shell")).toBeVisible();
+      }
       if (count > 1) {
         await page.getByRole("button", { name: "Previous route", exact: true }).click();
         await expect(page.getByRole("heading", { name: `Route ${count} of ${count}`, exact: true })).toBeVisible();
@@ -171,6 +179,9 @@ for (const count of [1, 2, 3])
         ).toEqual(originalCamera);
       }
       if (count === 3) {
+        await page.getByRole("button", { name: "Show route on map", exact: true }).click();
+        await expect(page.locator(".map-shell")).toBeVisible();
+        await expect.poll(() => page.evaluate(() => (window as any).testMap.isMoving())).toBe(false);
         const point = await page.evaluate(() => {
           const m = (window as any).testMap,
             p = m.project([-79.379, 43.653]);
@@ -182,10 +193,11 @@ for (const count of [1, 2, 3])
           const features = (await (window as any).testMap.getSource("route").getData()).features;
           return features.map((f: any) => ({ rank: f.properties.rank, emphasized: f.properties.emphasized }));
         })).toEqual([{ rank: 0, emphasized: false }, { rank: 1, emphasized: false }, { rank: 2, emphasized: true }]);
-        await expect(page.getByRole("heading", { name: "Route 2 of 3", exact: true })).toBeVisible();
         await page.mouse.move(20, 20);
         await expect.poll(() => page.evaluate(async () => (await (window as any).testMap.getSource("route").getData()).features.find((f: any) => f.properties.routeIndex === 1).properties.emphasized)).toBe(true);
         await page.mouse.click(point.x, point.y);
+        await page.getByRole("button", { name: "Back", exact: true }).click();
+        await expect(page.locator(".map-shell")).toBeHidden();
         await expect(page.getByRole("heading", { name: "Route 3 of 3", exact: true })).toBeVisible();
         await expect(page.locator(".route-hero > p")).toHaveText("12 min");
       }

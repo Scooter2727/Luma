@@ -181,11 +181,10 @@ test("route matching uses local walking segments and suppresses crossing, turn, 
     ],
   } as Route;
   expect(matchRoute(turn, fix()).bearing).toBeNull();
-  const bus = {
-    ...route,
-    segments: [{ ...route.segments[0], mode: "bus" }],
-  } as Route;
-  expect(matchRoute(bus, fix()).reason).toContain("transit");
+  for (const mode of ["bus", "streetcar", "subway"] as const) {
+    const transit = { ...route, segments: [{ ...route.segments[0], mode }] };
+    expect(matchRoute(transit, fix()).reason).toContain("transit");
+  }
   expect(matchRoute(route, fix(-79.39)).offRoute).toBe(true);
   const farDestination = {
     ...route,

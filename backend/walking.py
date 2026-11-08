@@ -76,12 +76,12 @@ class WalkingNetwork:
         self.reindex()
         self.g.graph['splits']={}
         self.stop_nodes={};self.stop_offsets={};self.stops={}
-        with (ROOT/'data/ttc_stops.csv').open(encoding='utf-8-sig',newline='') as f:
-            for s in csv.DictReader(f):
-                c=(float(s['stop_lon']),float(s['stop_lat']));self.stops[s['stop_id']]=s
-                try:n,offset=self.attach(self.g,c,60)
-                except ValueError:continue
-                self.stop_nodes[s['stop_id']]=n;self.stop_offsets[s['stop_id']]=offset
+        from .transit_data import stop_metadata
+        for s in stop_metadata().values():
+            c=(float(s['stop_lon']),float(s['stop_lat']));self.stops[s['stop_id']]=s
+            try:n,offset=self.attach(self.g,c,60)
+            except ValueError:continue
+            self.stop_nodes[s['stop_id']]=n;self.stop_offsets[s['stop_id']]=offset
 
     def reindex(self):
         self.edges=list(self.g.edges)
@@ -118,8 +118,8 @@ def network():
     with _network_lock:
         if _network is None:
             folder=cache_directory()
-            cache=folder/'pedestrian-network-v3.pickle'
-            sources=[Path(__file__),ROOT/'data/WAYFINDER_ALL_LOCATIONS.csv',ROOT/'data/ttc_stops.csv',ROOT/'data/sources/pedestrian-network.geojson',ROOT/'data/sources/centreline.geojson']
+            cache=folder/'pedestrian-network-v4.pickle'
+            sources=[Path(__file__),ROOT/'data/WAYFINDER_ALL_LOCATIONS.csv',ROOT/'data/ttc_stops.csv',ROOT/'data/sources/ttc-surface-gtfs.zip',ROOT/'data/sources/ttc-gtfs.zip',Path(__file__).with_name('transit_data.py'),ROOT/'data/sources/pedestrian-network.geojson',ROOT/'data/sources/centreline.geojson']
             stamp=[(p.stat().st_mtime_ns,p.stat().st_size) for p in sources]
             try:
                 with cache.open('rb') as f:stored=pickle.load(f)
@@ -170,4 +170,4 @@ def walk_details(g,path,speed):
         k=e['pednet_id'] if e['crossing'] else None
         if k is not None and k!=last:crossings.append(e)
         last=k
-    return dict(distance=sum(e['length'] for e in edges),duration_seconds=sum(edge_cost(e,speed) for e in edges),crossings=len(crossings),audible=sum(e['audible'] for e in crossings),tactile=sum(e['tactile'] for e in crossings),steps=instructions(g,path),coordinates=[list(n) for n in path])
+    return dict(pednet_ids=sorted({e['pednet_id'] for e in edges}),distance=sum(e['length'] for e in edges),duration_seconds=sum(edge_cost(e,speed) for e in edges),crossings=len(crossings),audible=sum(e['audible'] for e in crossings),tactile=sum(e['tactile'] for e in crossings),steps=instructions(g,path),coordinates=[list(n) for n in path])

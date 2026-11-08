@@ -18,10 +18,11 @@ import { CrosswalkIcon } from "./Icons";
 import PlacePicker from "./PlacePicker";
 import { CrossingChoices } from "./Preferences";
 import type { PreferenceProps } from "./Preferences";
-import type { Place, Route } from "./model";
+import type { Place, Route, ConstructionData } from "./model";
 import { timeLabel } from "./model";
 import { logoForTheme } from "./brand";
 import { LumaLoader } from "./LumaLoader";
+import TransitArrivals, { transitName } from "./TransitArrivals";
 type PlannerProps = PreferenceProps & {
   start: Place;
   end: Place;
@@ -31,8 +32,8 @@ type PlannerProps = PreferenceProps & {
   endValid: boolean;
   setStartValid: (v: boolean) => void;
   setEndValid: (v: boolean) => void;
-  mode: "walk" | "bus";
-  setMode: (m: "walk" | "bus") => void;
+  mode: "walk" | "transit";
+  setMode: (m: "walk" | "transit") => void;
   departure: string;
   setDeparture: (s: string) => void;
   timetable: { service_start: string; service_end: string } | null;
@@ -79,9 +80,9 @@ export function JourneyPlanner(p: PlannerProps) {
           <Footprints />
           Walk
         </button>
-        <button aria-pressed={p.mode === "bus"} onClick={() => p.setMode("bus")}>
+        <button aria-pressed={p.mode === "transit"} onClick={() => p.setMode("transit")}>
           <Bus />
-          Bus + walk
+          Transit
         </button>
       </div>
       <div className="journey-fields">
@@ -138,6 +139,7 @@ export function JourneyPlanner(p: PlannerProps) {
   );
 }
 type ChoiceProps = {
+  construction?: ConstructionData | null;
   routes: Route[];
   index: number;
   setIndex: (i: number) => void;
@@ -192,7 +194,7 @@ export function RouteChoices(p: ChoiceProps) {
               <small> min</small>
             </p>
             <div>
-              {r.timing === "scheduled" ? "Scheduled" : "Estimated"} arrival{" "}
+              {r.transit_stale ? "Previous estimated" : r.timing === "scheduled" ? "Scheduled" : r.timing === "real-time" ? "Live estimated" : r.timing === "mixed" ? "Live + scheduled" : "Estimated"} arrival{" "}
               {timeLabel(r.arrival_time)}
             </div>
           </section>
@@ -214,10 +216,10 @@ export function RouteChoices(p: ChoiceProps) {
               </li>
             )}
           </ul>
-          {r.mode === "bus" && (
+          {(r.mode === "bus" || r.mode === "transit") && (
             <div className="bus-details">
               <Bus />
-              <strong>Bus {r.bus_legs?.map((l) => l.route).join(" → ")}</strong>
+              <strong>{r.bus_legs?.map((l) => transitName(l.mode, l.route)).join(" → ")}</strong>
               <p>
                 {r.walking_minutes} min walking · {r.waiting_minutes} min
                 waiting · {r.riding_minutes} min riding
@@ -225,8 +227,14 @@ export function RouteChoices(p: ChoiceProps) {
               <p>
                 {r.transfers} transfer{r.transfers === 1 ? "" : "s"}
               </p>
+              {r.bus_legs?.map((l, i) => <p key={i}><strong>{transitName(l.mode, l.route)}</strong><br />{l.from_name} → {l.to_name}</p>)}
             </div>
           )}
+          {(p.construction?.available ?? r.construction_available) === false
+            ? <p className="helper">Construction data unavailable</p>
+            : (p.construction?.complete ?? r.construction_complete) === false
+              ? <p className="helper">Some construction data is unavailable</p>
+              : (p.construction?.stale ?? r.construction_stale) && <p className="helper">Construction data is temporarily using the last update</p>}
           <div className="route-pager">
             <button
               className="outline-button"
@@ -272,6 +280,7 @@ export function RouteChoices(p: ChoiceProps) {
           >
             <Play size={40} fill="currentColor" aria-hidden="true" />
           </button>
+          {(r.mode === "transit" || r.mode === "bus") && <TransitArrivals legs={r.bus_legs} departure={r.departure_time} />}
         </>
       )}
     </>
