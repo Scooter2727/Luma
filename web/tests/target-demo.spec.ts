@@ -48,3 +48,14 @@ test("leaving alignment, losing a sensor reading, pauses and long timer gaps res
   expect(game.update(180, 9000).round).toBe(1);
   expect(game.update(180, 9000).heldMs).toBe(0);
 });
+
+test("small boundary noise does not restart demo feedback or the aligned hold", () => {
+  const game = new TargetDemo(0, () => 0.5);
+  game.update(165, 0);
+  for (let now = 100; now < 3000; now += 100) {
+    const snapshot = game.update(now % 200 ? 162 : 166, now);
+    expect(snapshot.state).toBe("on");
+    expect(snapshot.heldMs).toBe(now);
+  }
+  expect(game.update(165, 3000).round).toBe(2);
+});

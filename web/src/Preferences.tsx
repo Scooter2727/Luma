@@ -103,25 +103,20 @@ export function CrossingChoices({
           {
             key: "audible",
             label: "Prefer audible crossings",
-            detail: "Prioritize intersections with listed audible signals.",
           },
           {
             key: "fewer",
             label: "Prefer fewer crossings",
-            detail: "Allow a longer walk to reduce crossings.",
           },
           {
             key: "tactile",
             label: "Prefer mapped tactile paving",
-            detail:
-              "Prioritize mapped tactile surfaces near crossing endpoints.",
           },
         ] as const
       ).map((c) => (
         <label className="toggle-card" key={c.key}>
           <span>
             <strong>{c.label}</strong>
-            <small>{c.detail}</small>
           </span>
           <input
             type="checkbox"

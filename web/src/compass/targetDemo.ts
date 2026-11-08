@@ -29,6 +29,7 @@ export class TargetDemo {
   private alignedAt: number | null = null;
   private lastTick: number | null = null;
   private round = 1;
+  private state: TargetState = "waiting";
   constructor(
     heading: number | null,
     private random = Math.random,
@@ -47,11 +48,12 @@ export class TargetDemo {
     const error = difference === null ? Infinity : Math.abs(difference);
     const state: TargetState = !valid
       ? "waiting"
-      : error <= 15
+      : error <= (this.state === "on" ? 19 : 15)
         ? "on"
-        : error <= 35
+        : error <= (this.state === "adjust" ? 40 : 35)
           ? "adjust"
           : "off";
+    this.state = state;
     if (state === "on") this.alignedAt ??= now;
     else this.alignedAt = null;
     const heldMs =
@@ -62,6 +64,7 @@ export class TargetDemo {
       this.target = randomTarget(heading!, this.random);
       this.alignedAt = null;
       this.round++;
+      this.state = "off";
       return {
         target: this.target,
         state: "off",

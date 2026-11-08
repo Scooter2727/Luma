@@ -12,9 +12,7 @@ import {
   ChevronsRight,
   X,
   Flag,
-  Volume2,
 } from "lucide-react";
-import { SignalIcon } from "./Icons";
 import type { Coord, Preferences, Route } from "./model";
 import { instructionText, saved, timeLabel } from "./model";
 type Props = {
@@ -102,29 +100,6 @@ export default function NavigationView({
                 {s.street || s.title.replace(/^Cross /, "").split(" at ")[0]}
               </strong>
             </span>
-            <span className="crossing-facts">
-              <span
-                className={
-                  "crossing-fact " +
-                  (s.control === "ts" || s.audible ? "listed" : "unknown")
-                }
-              >
-                <SignalIcon size={64} />
-                <span>
-                  {s.control === "ts" || s.audible
-                    ? "Signal listed"
-                    : "Signal ?"}
-                </span>
-              </span>
-              <span
-                className={
-                  "crossing-fact " + (s.audible ? "listed" : "unknown")
-                }
-              >
-                <Volume2 size={64} />
-                <span>{s.audible ? "Sound listed" : "Sound ?"}</span>
-              </span>
-            </span>
             <span className="crossing-caution">
               Check traffic and the signal before crossing.
             </span>
@@ -133,7 +108,6 @@ export default function NavigationView({
               Tap anywhere to repeat
             </span>
           </button>
-          <p className="helper">Mapped information · no live signal status.</p>
         </>
       ) : (
         <>

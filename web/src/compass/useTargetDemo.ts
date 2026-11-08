@@ -17,6 +17,8 @@ export function useTargetDemo(
   const feedback = useRef<DemoFeedback | null>(null);
   function controller() {
     return (feedback.current ??= new DemoFeedback(() => {
+      latest.current.sound = false;
+      feedback.current?.stop();
       setSound(false);
       setAudioError(true);
     }));
@@ -27,7 +29,7 @@ export function useTargetDemo(
     setDemo(null);
     setSound(false);
     setAudioError(false);
-    feedback.current?.stop();
+    feedback.current?.release();
   }
   function start() {
     const epoch = ++generation.current;
@@ -40,6 +42,7 @@ export function useTargetDemo(
     );
     void audio.then((ready) => {
       if (epoch === generation.current) {
+        latest.current.sound = ready;
         setSound(ready);
         setAudioError(!ready);
       }
@@ -58,6 +61,7 @@ export function useTargetDemo(
       .unlock()
       .then((ready) => {
         if (epoch === generation.current && game.current) {
+          latest.current.sound = ready;
           setSound(ready);
           setAudioError(!ready);
         }

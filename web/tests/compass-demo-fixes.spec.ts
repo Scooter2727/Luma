@@ -1,0 +1,84 @@
+import { test, expect } from "@playwright/test";
+import type { Page } from "@playwright/test";
+
+async function demo(page: Page) {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => {
+    const w = window as any;
+    localStorage.setItem("luma-screenReader", "true");
+    Object.defineProperty(DeviceOrientationEvent, "requestPermission", { value: () => Promise.resolve("granted"), configurable: true });
+    Object.defineProperty(navigator, "audioSession", { value: { type: "auto" }, configurable: true });
+    Object.defineProperty(navigator, "geolocation", { value: { watchPosition: () => 1, clearWatch: () => {} }, configurable: true });
+    w.notes = [];
+    w.contexts = [];
+    const NativeContext = AudioContext;
+    w.AudioContext = class extends NativeContext {
+      constructor() { super(); w.contexts.push(this); }
+      createOscillator() {
+        const node = super.createOscillator(), start = node.start.bind(node);
+        node.start = (...args: Parameters<OscillatorNode["start"]>) => {
+          w.notes.push(node.frequency.value);
+          return start(...args);
+        };
+        return node;
+      }
+    };
+  });
+  await page.route("**/api/locations", r => r.fulfill({ json: { features: [] } }));
+  await page.goto("/");
+  for (let i = 0; i < 4; i++) await page.getByRole("button", { name: "Next", exact: true }).click();
+  await page.getByRole("button", { name: "Use Luma", exact: true }).click();
+  await page.getByRole("button", { name: "Compass", exact: true }).click();
+  await page.evaluate(() => {
+    const w = window as any;
+    w.testHeading = 0;
+    w.testAccuracy = 10;
+    w.testTilt = 0;
+    w.publish = () => {
+      const event = new Event("deviceorientation");
+      Object.assign(event, { absolute: false, beta: w.testTilt, gamma: 0, webkitCompassHeading: w.testHeading, webkitCompassAccuracy: w.testAccuracy });
+      dispatchEvent(event);
+    };
+    w.publish();
+    w.sensor = setInterval(w.publish, 100);
+    Math.random = () => 0.5;
+  });
+  await expect(page.locator(".compass-reading strong")).toHaveText("0°");
+  await page.getByRole("button", { name: "Start demo", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Sound on. Mute beeps", exact: true })).toBeVisible();
+}
+
+test("demo beeps, survives approximate Safari samples, advances, and has rounded screen corners", async ({ page }) => {
+  await demo(page);
+  await expect.poll(() => page.evaluate(() => (window as any).notes.filter((f: number) => f === 740).length)).toBeGreaterThanOrEqual(3);
+  expect(await page.evaluate(() => (navigator as any).audioSession.type)).toBe("playback");
+  expect(await page.locator(".compass-fullscreen").evaluate(el => parseFloat(getComputedStyle(el, "::after").borderTopLeftRadius))).toBeGreaterThan(30);
+  await page.evaluate(() => {
+    const w = window as any;
+    w.testHeading = 150; w.testAccuracy = undefined; w.testTilt = 60; w.notes = [];
+  });
+  await expect(page.locator(".compass-face")).toHaveAttribute("data-demo-state", "adjust");
+  await expect.poll(() => page.evaluate(() => (window as any).notes.filter((f: number) => f === 520).length)).toBeGreaterThanOrEqual(2);
+  await page.evaluate(() => { const w = window as any; w.testHeading = 180; w.testAccuracy = 35; });
+  await expect(page.locator(".compass-face")).toHaveAttribute("data-demo-state", "on");
+  await expect(page.locator(".compass-face")).toHaveAttribute("data-round", "2", { timeout: 5000 });
+  await page.getByRole("button", { name: "Stop demo", exact: true }).click();
+  expect(await page.evaluate(() => (navigator as any).audioSession.type)).toBe("auto");
+  const count = await page.evaluate(() => (window as any).notes.length);
+  await page.waitForTimeout(700);
+  expect(await page.evaluate(() => (window as any).notes.length)).toBe(count);
+});
+
+test("interrupted Safari audio exposes retry and replaces the interrupted context", async ({ page }) => {
+  await demo(page);
+  await page.evaluate(() => {
+    Object.defineProperty((window as any).contexts[0], "state", { configurable: true, get: () => "interrupted" });
+  });
+  const retry = page.getByRole("button", { name: "Sound off. Enable beeps", exact: true });
+  await expect(retry).toBeVisible();
+  await retry.click();
+  await expect(page.getByRole("button", { name: "Sound on. Mute beeps", exact: true })).toBeVisible();
+  expect(await page.evaluate(() => (window as any).contexts.length)).toBe(2);
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  expect(await page.evaluate(() => (navigator as any).audioSession.type)).toBe("auto");
+});

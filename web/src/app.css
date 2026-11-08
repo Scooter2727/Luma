@@ -1319,6 +1319,7 @@ h1:focus {
   z-index: 10;
   pointer-events: none;
   border: 10px solid var(--demo-on);
+  border-radius: clamp(24px, 12vmin, 56px);
 }
 .compass-fullscreen[data-demo-state="off"]::after {
   border-color: var(--demo-off);

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ArrowLeft, Play, Square, Volume2, VolumeX } from "lucide-react";
 import type { Route } from "../model";
@@ -95,7 +95,13 @@ export default function CompassMode({
     }, 400);
     return () => { clearTimeout(timer); controller.abort(); };
   }, [roadKey]);
-  const targetGame = useTargetDemo(readHeading, saved("compass-haptics", true));
+  // This stationary game can use the same approximate heading as the dial.
+  // Route alignment keeps its stricter tilt/accuracy checks.
+  const demoHeading = useCallback(() => {
+    const sample = readHeading();
+    return { heading: sample.heading, reliable: sample.heading !== null };
+  }, [readHeading]);
+  const targetGame = useTargetDemo(demoHeading, saved("compass-haptics", true));
   const demo = targetGame.demo;
   const demoState = demo?.state ?? "idle";
   const targetX = demo

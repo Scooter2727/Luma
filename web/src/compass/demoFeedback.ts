@@ -9,6 +9,8 @@ export class DemoFeedback {
   private mode = "";
   private disposed = false;
   private lastPulse = -Infinity;
+  private session: { type: string } | null = null;
+  private previousSession = "auto";
   private onFailure: () => void;
   constructor(onFailure: () => void) {
     this.onFailure = onFailure;
@@ -21,8 +23,40 @@ export class DemoFeedback {
         (window as unknown as { webkitAudioContext?: typeof AudioContext })
           .webkitAudioContext;
       if (!C || this.disposed) return false;
+      // Safari otherwise treats Web Audio as ambient, including silent mode.
+      const session = (navigator as unknown as { audioSession?: { type: string } }).audioSession;
+      if (session && !this.session) {
+        this.session = session;
+        this.previousSession = session.type;
+        try { session.type = "playback"; } catch {}
+      }
+      if (this.context && ["closed", "interrupted"].includes(this.context.state)) {
+        void this.context.close().catch(() => {});
+        this.context = null;
+      }
       this.context ??= new C();
-      await this.context.resume();
+      const context = this.context;
+      // Prime the output during the tap, before sensor callbacks start beeps.
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      oscillator.frequency.value = 660;
+      gain.gain.setValueAtTime(0.001, context.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.12, context.currentTime + 0.008);
+      gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 0.09);
+      oscillator.connect(gain);
+      gain.connect(context.destination);
+      this.nodes.add(oscillator);
+      oscillator.onended = () => { this.nodes.delete(oscillator); oscillator.disconnect(); gain.disconnect(); };
+      oscillator.start();
+      oscillator.stop(context.currentTime + 0.1);
+      this.lastPulse = performance.now();
+      let timeout = 0;
+      try {
+        await Promise.race([
+          context.resume(),
+          new Promise((_, reject) => { timeout = window.setTimeout(() => reject(new Error("Audio did not start")), 2000); }),
+        ]);
+      } finally { clearTimeout(timeout); }
       return !this.disposed && this.context.state === "running";
     } catch {
       return false;
@@ -97,9 +131,17 @@ export class DemoFeedback {
       navigator.vibrate?.(0);
     } catch {}
   }
-  dispose() {
+  release() {
     this.stop();
-    this.disposed = true;
     void this.context?.close().catch(() => {});
+    this.context = null;
+    if (this.session && this.session.type === "playback") {
+      try { this.session.type = this.previousSession; } catch {}
+    }
+    this.session = null;
+  }
+  dispose() {
+    this.release();
+    this.disposed = true;
   }
 }

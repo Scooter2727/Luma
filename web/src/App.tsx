@@ -170,7 +170,8 @@ export default function App() {
     panel,
     `${view}:${showOptions}`,
     !onboarding && !showHero,
-    false,
+    true,
+    true,
   );
   useEffect(() => {
     document.documentElement.dataset.theme = prefs.theme;
