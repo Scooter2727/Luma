@@ -161,7 +161,7 @@ export function SpeechKeys({ onSaved }: { onSaved: () => void }) {
           size={72}
         />
       )}
-      <div role="status" className="key-results">
+      <div className="key-results" role={busy ? undefined : "status"}>
         {error && <p className="key-result bad">{error}</p>}
         {check &&
           (
