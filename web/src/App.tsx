@@ -224,7 +224,7 @@ export default function App() {
         })
     ).then((outcome) => {
       if (outcome !== "failed" || turn !== speechTurn.current) return;
-      const fallback = "AI voice is unavailable right now. " + text;
+      const fallback = "Luma voice is unavailable right now. " + text;
       setNotice(fallback);
       if (!prefs.screenReader) deviceSpeak(fallback);
     });

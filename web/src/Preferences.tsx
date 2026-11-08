@@ -14,7 +14,6 @@ import {
   Headphones,
   Lock,
   SlidersHorizontal,
-  Sparkles,
 } from "lucide-react";
 import { CrosswalkIcon } from "./Icons";
 import { logoForTheme } from "./brand";
@@ -229,7 +228,7 @@ export function SpeedCard(props: PreferenceProps) {
             className="voice-test"
             onClick={() => testAiVoice(SAMPLE_INSTRUCTION)}
           >
-            <Sparkles size={30} />
+            <Volume2 size={30} />
             Test Luma voice
           </button>
         )}
@@ -241,7 +240,8 @@ export function SpeedCard(props: PreferenceProps) {
 export function Onboarding(
   props: PreferenceProps & { done: () => void; active?: boolean },
 ) {
-  const { prefs, change, speak, done, active = true } = props;
+  const { prefs, change, done, active = true, speechAvailable, testAiVoice } =
+    props;
   const [step, setStep] = useState(1);
   const body = useRef<HTMLDivElement>(null);
   useScreenTransition(body, step, active);
@@ -324,25 +324,28 @@ export function Onboarding(
             </svg>
           </div>
         )}
-        {(step === 2 || step === 3) && (
-          <button
-            className="outline-button test-setup"
-            onClick={() =>
-              speak(
-                step === 3
-                  ? prefs.directions === "cardinal"
-                    ? "Head northeast along Queen Street. Continue 50 metres."
-                    : prefs.directions === "clock"
-                      ? "Toward 2 o’clock. Continue 50 metres."
-                      : "Turn slightly right. Continue 50 metres."
-                  : "Luma voice guidance. Your next crossing is ahead.",
-              )
-            }
-          >
-            <Volume2 size={32} />
-            Test voice
-          </button>
-        )}
+        {(step === 2 || step === 3) &&
+          !prefs.screenReader &&
+          speechAvailable &&
+          testAiVoice && (
+            <button
+              className="outline-button test-setup"
+              onClick={() =>
+                testAiVoice(
+                  step === 3
+                    ? prefs.directions === "cardinal"
+                      ? "Head northeast along Queen Street. Continue 50 metres."
+                      : prefs.directions === "clock"
+                        ? "Toward 2 o’clock. Continue 50 metres."
+                        : "Turn slightly right. Continue 50 metres."
+                    : SAMPLE_INSTRUCTION,
+                )
+              }
+            >
+              <Volume2 size={32} />
+              Test Luma voice
+            </button>
+          )}
         <div className="setup-actions">
           <button
             className="outline-button"
