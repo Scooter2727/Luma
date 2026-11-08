@@ -32,8 +32,7 @@ export default function MapView({
   const container = useRef<HTMLDivElement>(null),
     map = useRef<maplibregl.Map | null>(null),
     markers = useRef<maplibregl.Marker[]>([]);
-  const [mapReady, setMapReady] = useState(false),
-    [mapError, setMapError] = useState(false);
+  const [mapReady, setMapReady] = useState(false);
   const pickModeRef = useRef(pickMode);
   const themeRef = useRef(theme);
   themeRef.current = theme;
@@ -62,7 +61,6 @@ export default function MapView({
       try {
         images = await mapIconImages(themeRef.current);
       } catch {
-        if (!disposed) setMapError(true);
         return;
       }
       if (disposed) return;
@@ -206,10 +204,6 @@ export default function MapView({
       setMapReady(true);
     });
 
-    let failures = 0;
-    m.on("error", () => {
-      if (++failures > 4) setMapError(true);
-    });
     return () => {
       disposed = true;
       m.remove();
@@ -243,9 +237,7 @@ export default function MapView({
         m.setPaintProperty("route-connect", "line-color", palette.walk);
         container.current?.setAttribute("data-icon-theme", theme);
       })
-      .catch(() => {
-        if (!cancelled) setMapError(true);
-      });
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -327,12 +319,6 @@ export default function MapView({
       inert={decorative || (!visible && window.innerWidth <= 760)}
     >
       <div ref={container} className="map" />
-      {mapError && (
-        <p className="map-warning" role="status">
-          Some map tiles could not load. Search and directions are still
-          available.
-        </p>
-      )}
     </section>
   );
 }

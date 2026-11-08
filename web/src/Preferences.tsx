@@ -155,7 +155,6 @@ export function DisplayChoices({
               ))}
             </span>
             {t.name}
-            {prefs.theme === t.id && <Check size={22} />}
           </button>
         ))}
       </div>
@@ -237,9 +236,7 @@ export function Onboarding(
     <section className="onboarding" aria-label="Set up Luma">
       <header className="setup-header">
         <img src={logoForTheme(prefs.theme)} alt="" />
-        <button className="text-action" onClick={done}>
-          Skip setup
-        </button>
+        <strong>Luma</strong>
       </header>
       <div className="setup-progress" aria-hidden="true">
         {[1, 2, 3, 4, 5].map((n) => (
@@ -298,7 +295,9 @@ export function Onboarding(
         {step === 4 && <CrossingChoices {...props} />}{" "}
         {step === 5 && (
           <div className="setup-summary">
-            <Check size={64} />
+            <svg className="setup-checkmark" width="144" height="144" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="m5 12 4 4L19 6" pathLength="1" />
+            </svg>
           </div>
         )}
         {(step === 2 || step === 3) && (

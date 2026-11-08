@@ -25,6 +25,10 @@
 }
 * {
   box-sizing: border-box;
+  scrollbar-width: none;
+}
+*::-webkit-scrollbar {
+  display: none;
 }
 body {
   margin: 0;
@@ -233,7 +237,7 @@ h1:focus {
   width: 458px;
   max-height: calc(100dvh - 40px);
   overflow: auto;
-  scrollbar-width: thin;
+  scrollbar-width: none;
   scrollbar-color: #b6bdcd transparent;
   background: var(--soft);
   border: 1px solid var(--line);
@@ -531,6 +535,9 @@ h1:focus {
   padding: 6px;
   border-radius: 20px;
 }
+.endpoint-tools .schedule-toggle {
+  margin-left: auto;
+}
 .travel-modes button {
   display: flex;
   align-items: center;
@@ -572,6 +579,17 @@ h1:focus {
   border: 2px solid var(--line);
   border-radius: 18px;
   background: var(--surface);
+}
+.departure-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.departure-summary .text-action {
+  font-size: 17px;
+  gap: 6px;
 }
 .preferences-details summary,
 .itinerary summary,
@@ -1006,10 +1024,30 @@ h1:focus {
   padding: 24px 5px;
   display: flex;
   flex-direction: column;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
   gap: 24px;
 }
 .setup-summary > svg {
   color: var(--readable-accent);
+}
+.setup-checkmark {
+  flex-shrink: 0;
+}
+.setup-checkmark path {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+  animation: setup-check-draw 750ms ease-out both;
+}
+@keyframes setup-check-draw {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .setup-checkmark path {
+    animation: none;
+  }
 }
 .navigation-panel {
   padding: 16px;

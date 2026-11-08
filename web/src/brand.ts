@@ -1,7 +1,7 @@
-// Each SVG view frames one of the four unchanged logos supplied in the sheet.
+// Separate URLs avoid SVG-fragment caching when switching themes in Safari.
 export function logoForTheme(theme: string) {
   const name = ["default", "red-green", "blue-yellow", "contrast"].includes(theme)
     ? theme
     : "default";
-  return `/brand/luma-theme-logos.svg#${name}`;
+  return `/brand/luma-logo-${name}.svg`;
 }

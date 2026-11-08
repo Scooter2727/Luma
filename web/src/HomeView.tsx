@@ -7,7 +7,6 @@ import {
   Clock,
   Route as RouteIcon,
   Map as MapIcon,
-  ArrowRight,
 } from "lucide-react";
 import PlacePicker from "./PlacePicker";
 import { logoForTheme } from "./brand";
@@ -28,8 +27,7 @@ type Props = {
 export default function HomeView(p: Props) {
   const [typing, setTyping] = useState(false),
     [query, setQuery] = useState(""),
-    [destination, setDestination] = useState(p.end),
-    [valid, setValid] = useState(true);
+    [destination, setDestination] = useState(p.end);
   return (
     <>
       <header className="page-header">
@@ -81,19 +79,10 @@ export default function HomeView(p: Props) {
               query={query}
               onChange={(x) => {
                 setDestination(x);
-                setValid(true);
                 p.plan(x);
               }}
-              onValidityChange={setValid}
+              onValidityChange={() => {}}
             />
-            <button
-              className="text-action"
-              disabled={!valid}
-              onClick={() => p.plan(destination)}
-            >
-              Choose routes
-              <ArrowRight />
-            </button>
           </div>
         )}
         <button className="where-button" onClick={p.where}>

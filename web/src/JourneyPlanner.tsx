@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -13,6 +14,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Play,
+  CalendarClock,
 } from "lucide-react";
 import { CrosswalkIcon } from "./Icons";
 import PlacePicker from "./PlacePicker";
@@ -42,6 +44,7 @@ type PlannerProps = PreferenceProps & {
   toggleSaved: () => void;
 };
 export function JourneyPlanner(p: PlannerProps) {
+  const [scheduling, setScheduling] = useState(!!p.departure);
   const date = (v: string) =>
     v.slice(0, 4) + "-" + v.slice(4, 6) + "-" + v.slice(6, 8);
   return (
@@ -91,6 +94,15 @@ export function JourneyPlanner(p: PlannerProps) {
             <MapPin size={20} />
             Choose end on map
           </button>
+          {p.mode === "bus" && (
+            <button className="schedule-toggle" aria-expanded={scheduling} aria-controls="departure-time" onClick={() => {
+              if (scheduling) { p.setDeparture(""); setScheduling(false); }
+              else setScheduling(true);
+            }}>
+              <CalendarClock size={20} />
+              {scheduling ? "Leave now" : "Schedule"}
+            </button>
+          )}
         </div>
       </div>
       <div className="travel-modes" role="group" aria-label="Travel mode">
@@ -111,17 +123,17 @@ export function JourneyPlanner(p: PlannerProps) {
       </div>
       {p.mode === "bus" && (
         <div className="departure-picker">
-          <label className="select-label">
+          <div className="departure-summary">
+            <span>{p.departure ? "Scheduled departure" : "Leaving now"}</span>
+          </div>
+          {scheduling && <label className="select-label" id="departure-time">
             Leave at (Toronto time)
             <input
               type="datetime-local"
               value={p.departure}
               onChange={(e) => p.setDeparture(e.target.value)}
             />
-          </label>
-          <button className="text-action" onClick={() => p.setDeparture("")}>
-            {p.departure ? "Leave now" : "Leaving now"}
-          </button>
+          </label>}
           <p className="helper">
             Scheduled TTC times.{" "}
             {p.timetable && (
