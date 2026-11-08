@@ -57,6 +57,23 @@ export function JourneyPlanner(p: PlannerProps) {
           <MapIcon size={27} />
         </button>
       </header>
+      <div className="endpoint-tools">
+        <button className="schedule-toggle" aria-expanded={scheduling} aria-controls="departure-time" onClick={() => {
+          if (scheduling) { p.setDeparture(""); setScheduling(false); }
+          else setScheduling(true);
+        }}>
+          <CalendarClock size={20} />
+          {scheduling ? "Leave now" : "Schedule"}
+        </button>
+      </div>
+      {scheduling && (
+        <div className="departure-picker">
+          <label className="select-label" id="departure-time">
+            Leave at (Toronto time)
+            <input type="datetime-local" value={p.departure} onChange={e => p.setDeparture(e.target.value)} />
+          </label>
+        </div>
+      )}
       <div className="travel-modes" role="group" aria-label="Travel mode">
         <button aria-pressed={p.mode === "walk"} onClick={() => p.setMode("walk")}>
           <Footprints />
@@ -86,28 +103,7 @@ export function JourneyPlanner(p: PlannerProps) {
           }}
           onValidityChange={p.setEndValid}
         />
-        <div className="endpoint-tools">
-            <button className="schedule-toggle" aria-expanded={scheduling} aria-controls="departure-time" onClick={() => {
-              if (scheduling) { p.setDeparture(""); setScheduling(false); }
-              else setScheduling(true);
-            }}>
-              <CalendarClock size={20} />
-              {scheduling ? "Leave now" : "Schedule"}
-            </button>
-        </div>
       </div>
-      {scheduling && (
-        <div className="departure-picker">
-          {scheduling && <label className="select-label" id="departure-time">
-            Leave at (Toronto time)
-            <input
-              type="datetime-local"
-              value={p.departure}
-              onChange={(e) => p.setDeparture(e.target.value)}
-            />
-          </label>}
-        </div>
-      )}
       <details className="preferences-details">
         <summary>
           <SlidersHorizontal />
@@ -180,7 +176,7 @@ export function RouteChoices(p: ChoiceProps) {
       </header>
       {p.busy && (
         <div className="planning-status">
-          <LumaLoader label="Finding your way…" />
+          <LumaLoader label="Finding your way…" onBack={p.edit} />
           <p>
             Calculating paths and directions. The first journey can take longer
             while the network loads.
@@ -234,9 +230,9 @@ export function RouteChoices(p: ChoiceProps) {
           <div className="route-pager">
             <button
               className="outline-button"
-              disabled={p.index === 0}
+              disabled={p.routes.length < 2}
               aria-label="Previous route"
-              onClick={() => p.setIndex(p.index - 1)}
+              onClick={() => p.setIndex((p.index - 1 + p.routes.length) % p.routes.length)}
             >
               <ChevronLeft size={38} />
             </button>
@@ -261,9 +257,9 @@ export function RouteChoices(p: ChoiceProps) {
             </button>
             <button
               className="outline-button"
-              disabled={p.index === p.routes.length - 1}
+              disabled={p.routes.length < 2}
               aria-label="Next route"
-              onClick={() => p.setIndex(p.index + 1)}
+              onClick={() => p.setIndex((p.index + 1) % p.routes.length)}
             >
               <ChevronRight size={38} />
             </button>

@@ -117,6 +117,7 @@ export default function ReportView({
     [error, setError] = useState(""),
     [confirmation, setConfirmation] = useState<ReportRecord | null>(null);
   const notesInput = useRef<HTMLTextAreaElement>(null);
+  const [savingOverlay, setSavingOverlay] = useState(false);
   const [availability, setAvailability] = useState({
     enabled: false,
     reason: "Checking report availability…",
@@ -145,6 +146,7 @@ export default function ReportView({
   async function submit() {
     if (!valid || !availability.enabled) return;
     setBusy(true);
+    setSavingOverlay(true);
     setError("");
     try {
       const r = await request<ReportRecord>("/api/reports", {
@@ -172,6 +174,7 @@ export default function ReportView({
       setError((e as Error).message);
     } finally {
       setBusy(false);
+      setSavingOverlay(false);
     }
   }
   function voice() {
@@ -316,7 +319,10 @@ export default function ReportView({
               Reports are saved in Luma for review. They are not automatically sent to the City or used to change routes.
             </p>
           )}
-          {busy && <LumaLoader label="Saving report…" size={72} />}
+          {busy && savingOverlay && <LumaLoader label="Saving report…" size={72} onBack={() => {
+            setSavingOverlay(false);
+            requestAnimationFrame(() => notesInput.current?.focus());
+          }} />}
           <button
             className="dark-button"
             disabled={busy || !valid || !availability.enabled}

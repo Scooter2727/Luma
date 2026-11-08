@@ -412,6 +412,10 @@ export function Settings(
       {section === "voice" && (
         <>
           <SpeedCard {...props} />
+          <label className="toggle-card">
+            <strong>Button sounds</strong>
+            <input type="checkbox" data-sound-toggle checked={props.prefs.sounds} onChange={event => props.change({ sounds: event.target.checked })} />
+          </label>
         </>
       )}{" "}
       {section === "directions" && <DirectionsChoices {...props} />}

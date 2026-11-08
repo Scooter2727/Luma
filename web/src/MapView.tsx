@@ -2,8 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import * as maplibregl from "maplibre-gl";
 import mapWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { mapIconImages, mapPalette } from "./mapTheme";
+import { mapIconImages } from "./mapTheme";
 import type { Coord, Feature, Route, Place, Step } from "./model";
+import { routeColors, routeFeatures } from "./routeStyles";
+import { symbolInk } from "./mapTheme";
 maplibregl.setWorkerUrl(mapWorkerUrl);
 type Props = {
   decorative?: boolean;
@@ -11,6 +13,9 @@ type Props = {
   data: Feature[];
   active: string[];
   route?: Route;
+  alternatives?: Route[];
+  selectedIndex?: number;
+  onRouteSelect?: (index: number) => void;
   pickMode: "start" | "end" | null;
   onPick: (target: "start" | "end", place: Place) => void;
   onSelect: (feature: Feature) => void;
@@ -23,6 +28,9 @@ export default function MapView({
   data,
   active,
   route,
+  alternatives,
+  selectedIndex = 0,
+  onRouteSelect,
   pickMode,
   onPick,
   onSelect,
@@ -33,6 +41,7 @@ export default function MapView({
     map = useRef<maplibregl.Map | null>(null),
     markers = useRef<maplibregl.Marker[]>([]);
   const [mapReady, setMapReady] = useState(false);
+  const [hoveredRoute, setHoveredRoute] = useState<number | null>(null);
   const pickModeRef = useRef(pickMode);
   const themeRef = useRef(theme);
   themeRef.current = theme;
@@ -40,6 +49,10 @@ export default function MapView({
   const pickRef = useRef(onPick);
   pickRef.current = onPick;
   const selectedRef = useRef(onSelect);
+  const routeSelectRef = useRef(onRouteSelect);
+  routeSelectRef.current = onRouteSelect;
+  const displayRoutes = alternatives?.slice(0, 3) ?? (route ? [route] : []);
+  const cameraKey = JSON.stringify(displayRoutes.map((r) => r.coordinates));
   selectedRef.current = (f) => {
     if (!pickModeRef.current) onSelect(f);
   };
@@ -51,7 +64,7 @@ export default function MapView({
       style: "/maps/simple.json",
       center: [-79.383, 43.652],
       zoom: 14.7,
-      minZoom: 10,
+      minZoom: 8,
       maxZoom: 19,
       attributionControl: false,
     });
@@ -94,38 +107,69 @@ export default function MapView({
         type: "geojson",
         data: { type: "FeatureCollection", features: [] },
       });
-      m.addLayer({
-        id: "route-halo",
-        type: "line",
-        source: "route",
-        paint: { "line-color": "white", "line-width": 10 },
-        layout: { "line-cap": "round", "line-join": "round" },
-      });
-      m.addLayer({
-        id: "route-line",
-        type: "line",
-        source: "route",
-        filter: ["!=", ["get", "mode"], "connect"],
-        paint: {
-          "line-color": ["match", ["get", "mode"], "bus", "#b04d16", "#5865F2"],
-          "line-width": 5,
-        },
-        layout: { "line-cap": "round", "line-join": "round" },
-      });
-      m.addLayer({
-        id: "route-connect",
-        type: "line",
-        source: "route",
-        filter: ["==", ["get", "mode"], "connect"],
-        paint: {
-          "line-color": "#5865F2",
-          "line-width": 4,
-          "line-dasharray": [1, 2],
-        },
-      });
+      const colors = routeColors(themeRef.current);
+      // Fixed route styles; the emphasized route is moved above the others below.
+      for (const rank of [2, 1, 0]) {
+        const id = ["route-line", "route-secondary", "route-third"][rank];
+        const width = [6, 8, 10][rank];
+        const dash = rank === 1 ? [3, 2] : rank === 2 ? [0.2, 2] : undefined;
+        const filter: maplibregl.FilterSpecification = [
+          "==",
+          ["get", "rank"],
+          rank,
+        ];
+        const layout: maplibregl.LineLayerSpecification["layout"] = {
+          "line-cap": rank === 1 ? "butt" : "round",
+          "line-join": "round",
+        };
+        m.addLayer({
+          id: id + "-halo",
+          type: "line",
+          source: "route",
+          filter,
+          layout,
+          paint: {
+            "line-color": ["case", ["get", "emphasized"], symbolInk(colors[rank]), "#F6F6F6"],
+            "line-width": width + 1.5,
+            ...(dash
+              ? {
+                  "line-dasharray": dash.map(
+                    (value) => (value * width) / (width + 1.5),
+                  ),
+                }
+              : {}),
+          },
+        });
+        m.addLayer({
+          id,
+          type: "line",
+          source: "route",
+          filter,
+          layout,
+          paint: {
+            "line-color": ["case", ["get", "emphasized"], colors[rank], "#858B94"],
+            "line-width": width,
+            ...(dash ? { "line-dasharray": dash } : {}),
+          },
+        });
+      }
       m.on("click", (e) => {
         const target = pickModeRef.current;
-        if (!target) return;
+        if (!target) {
+          if (routeSelectRef.current) {
+            const point = e.point;
+            const hits = m.queryRenderedFeatures(
+              [
+                [point.x - 8, point.y - 8],
+                [point.x + 8, point.y + 8],
+              ],
+              { layers: ["route-line", "route-secondary", "route-third"] },
+            );
+            if (hits[0])
+              routeSelectRef.current(Number(hits[0].properties.routeIndex));
+          }
+          return;
+        }
         const place: Place = {
           id: "pin-" + Date.now(),
           name: target === "start" ? "Pinned start" : "Pinned destination",
@@ -135,6 +179,13 @@ export default function MapView({
         pickRef.current(target, place);
       });
       m.on("click", "points", (e) => {
+        if (
+          routeSelectRef.current &&
+          m.queryRenderedFeatures(e.point, {
+            layers: ["route-line", "route-secondary", "route-third"],
+          }).length
+        )
+          return;
         const f = e.features?.[0];
         if (f) {
           selectedRef.current(f as unknown as Feature);
@@ -150,16 +201,41 @@ export default function MapView({
         () => (m.getCanvas().style.cursor = "pointer"),
       );
       m.on("mouseleave", "points", () => (m.getCanvas().style.cursor = ""));
+      m.on("mousemove", (e) => {
+        if (!routeSelectRef.current || pickModeRef.current) return;
+        const hits = m.queryRenderedFeatures(e.point, {
+          layers: ["route-line", "route-secondary", "route-third"],
+        });
+        setHoveredRoute(hits[0] ? Number(hits[0].properties.routeIndex) : null);
+        m.getCanvas().style.cursor = hits.length ? "pointer" : "";
+      });
+      const clearHover = () => setHoveredRoute(null);
+      m.getCanvas().addEventListener("mouseleave", clearHover);
+      m.on("remove", () => m.getCanvas().removeEventListener("mouseleave", clearHover));
       m.on("idle", () => {
         container.current?.setAttribute(
           "data-visible-route-segments",
-          String(m.queryRenderedFeatures({ layers: ["route-line"] }).length),
+          String(
+            m.queryRenderedFeatures({
+              layers: ["route-line", "route-secondary", "route-third"],
+            }).length,
+          ),
+        );
+        container.current?.setAttribute(
+          "data-visible-routes",
+          JSON.stringify([
+            ...new Set(
+              m
+                .queryRenderedFeatures({
+                  layers: ["route-line", "route-secondary", "route-third"],
+                })
+                .map((f) => Number(f.properties.routeIndex)),
+            ),
+          ]),
         );
         container.current?.setAttribute(
           "data-visible-points",
-          String(
-            m.queryRenderedFeatures({ layers: ["points"] }).length,
-          ),
+          String(m.queryRenderedFeatures({ layers: ["points"] }).length),
         );
       });
       setMapReady(true);
@@ -178,17 +254,12 @@ export default function MapView({
     mapIconImages(theme)
       .then((images) => {
         if (cancelled) return;
-        const palette = mapPalette(theme);
         for (const { id, image } of images) m.updateImage(id, image);
-        m.setPaintProperty("route-halo", "line-color", palette.halo);
-        m.setPaintProperty("route-line", "line-color", [
-          "match",
-          ["get", "mode"],
-          "bus",
-          palette.bus,
-          palette.walk,
-        ]);
-        m.setPaintProperty("route-connect", "line-color", palette.walk);
+        routeColors(theme).forEach((color, rank) => {
+          const id = ["route-line", "route-secondary", "route-third"][rank];
+          m.setPaintProperty(id, "line-color", ["case", ["get", "emphasized"], color, "#858B94"]);
+          m.setPaintProperty(id + "-halo", "line-color", ["case", ["get", "emphasized"], symbolInk(color), "#F6F6F6"]);
+        });
         container.current?.setAttribute("data-icon-theme", theme);
       })
       .catch(() => {});
@@ -208,21 +279,16 @@ export default function MapView({
   useEffect(() => {
     if (!mapReady || !map.current) return;
     const m = map.current;
-    (m.getSource("route") as maplibregl.GeoJSONSource).setData({
-      type: "FeatureCollection",
-      features: route
-        ? route.segments
-            .filter((s) => s.coordinates.length > 1)
-            .map((s) => ({
-              type: "Feature" as const,
-              properties: { mode: s.mode },
-              geometry: {
-                type: "LineString" as const,
-                coordinates: s.coordinates,
-              },
-            }))
-        : [],
-    });
+    (m.getSource("route") as maplibregl.GeoJSONSource).setData(
+      routeFeatures(displayRoutes, alternatives ? (hoveredRoute ?? selectedIndex) : 0),
+    );
+    const emphasized = displayRoutes[alternatives ? (hoveredRoute ?? selectedIndex) : 0];
+    if (emphasized) {
+      const rank = emphasized.style_rank ?? (alternatives ? (hoveredRoute ?? selectedIndex) : 0);
+      const id = ["route-line", "route-secondary", "route-third"][rank];
+      m.moveLayer(id + "-halo");
+      m.moveLayer(id);
+    }
     markers.current.forEach((x) => x.remove());
     markers.current = [];
     if (route) {
@@ -238,17 +304,28 @@ export default function MapView({
           new maplibregl.Marker({ element: el }).setLngLat(c).addTo(m),
         );
       }
+    }
+  }, [route, alternatives, selectedIndex, hoveredRoute, mapReady]);
+  useEffect(() => { setHoveredRoute(null); }, [selectedIndex, alternatives === undefined]);
+  useEffect(() => {
+    const m = map.current;
+    if (m && mapReady && displayRoutes.length) {
       const b = new maplibregl.LngLatBounds();
-      route.coordinates.forEach((c) => b.extend(c));
+      displayRoutes.forEach((r) => r.coordinates.forEach((c) => b.extend(c)));
       m.fitBounds(b, {
         padding:
           window.innerWidth > 760
             ? { top: 70, bottom: 70, left: 500, right: 60 }
-            : { top: 110, bottom: 130, left: 35, right: 35 },
+            : {
+                top: 90,
+                bottom: alternatives ? window.innerHeight * 0.54 + 20 : 130,
+                left: 35,
+                right: 35,
+              },
         maxZoom: 16,
       });
     }
-  }, [route, mapReady]);
+  }, [cameraKey, mapReady, visible]);
 
   useEffect(() => {
     if (!mapReady || !map.current || !focus) return;

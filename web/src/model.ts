@@ -19,6 +19,7 @@ export type Feature = {
   properties: Record<string, string>;
 };
 export type Route = {
+  style_rank?: number;
   id: string;
   name: string;
   coordinates: Coord[];
@@ -165,6 +166,7 @@ export type Preferences = {
   tactile: boolean;
   rate: number;
   screenReader: boolean;
+  sounds: boolean;
   large: boolean;
   theme: string;
   directions: "clock" | "left-right" | "cardinal";

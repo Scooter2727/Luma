@@ -162,6 +162,26 @@ def route(req:RouteRequest):
     response=plan_routes(req)
     add_spoken_text(response['routes'],req.directions)
     return response
+def walking_alternatives(g,a,b,paths,speed,prefs,limit=3):
+    """Bounded searches for genuine alternatives without changing the graph."""
+    paths=list(paths)
+    cost=weight(speed,**prefs)
+    physical=lambda path:sum(weight(speed)(u,v,g[u][v]) for u,v in zip(path,path[1:]))
+    baseline=min(map(physical,paths))
+    edges=lambda path:{frozenset((u,v)) for u,v in zip(path,path[1:])}
+    for penalty in (.5,1,2,4):
+        if len(paths)>=limit:break
+        old_edges=[edges(path) for path in paths]
+        used=set().union(*old_edges)
+        def alternative_cost(u,v,e):return cost(u,v,e)*(1+penalty if frozenset((u,v)) in used else 1)
+        try:path=nx.astar_path(g,a,b,heuristic=lambda x,y:distance(x,y)/speed,weight=alternative_cost)
+        except nx.NetworkXNoPath:break
+        if path in paths or physical(path)>baseline*1.5+120:continue
+        length=sum(g[u][v]['length'] for u,v in zip(path,path[1:]))
+        if any(sum(g[u][v]['length'] for u,v in zip(path,path[1:]) if frozenset((u,v)) in old)>length*.95 for old in old_edges):continue
+        paths.append(path)
+    return paths[:limit]
+
 def plan_routes(req:RouteRequest):
     if distance(req.start,req.end)<5:raise HTTPException(422,'Start and destination are the same. Choose two different locations.')
     depart=departure(req);net=network()
@@ -179,7 +199,8 @@ def plan_routes(req:RouteRequest):
         # Give users useful context when walking is quicker than waiting for a bus.
         try:
             path=nx.astar_path(g,a,b,heuristic=lambda x,y:distance(x,y)/req.walking_speed,weight=weight(req.walking_speed,**prefs))
-            walk=finish_walk(g,path,req,depart,offsets,'Walking alternative',str(len(results)))
+            results=results[:2]
+            walk=finish_walk(g,path,req,depart,offsets,'Alternative walking route',str(len(results)))
             walk['explanation']='Walk the whole journey with your crossing preferences.' if preferred else 'Walk the whole journey without waiting for a bus.'
             results.append(walk)
         except nx.NetworkXNoPath:pass
@@ -190,8 +211,14 @@ def plan_routes(req:RouteRequest):
         except nx.NetworkXNoPath:raise HTTPException(422,'No connected pedestrian route between these locations in the source network. Try a nearby entrance or intersection.')
         results=[finish_walk(g,selected,req,depart,offsets,'Accessibility preferences' if preferred else 'Fastest walk','0')]
         if selected!=fastest:results.append(finish_walk(g,fastest,req,depart,offsets,'Fastest walk','1'))
+        seeds=[selected]+([fastest] if selected!=fastest else [])
+        alternatives=walking_alternatives(g,a,b,seeds,req.walking_speed,prefs)
+        for path in alternatives[len(seeds):]:
+            results.append(finish_walk(g,path,req,depart,offsets,'Alternative walking route',str(len(results))))
         baseline=walk_details(g,fastest,req.walking_speed)
         for r in results:
             r['extra_minutes']=max(0,math.ceil((r['duration_seconds']-math.ceil(baseline['duration_seconds']+sum(offsets)/req.walking_speed))/60))
             r['explanation']=('Prioritizes '+', '.join(label for enabled,label in [(req.prefer_audible,'listed audible signals'),(req.fewer_crossings,'fewer crossings'),(req.prefer_tactile,'mapped tactile paving')] if enabled)+'. '+('The fastest path already meets this preference balance.' if selected==fastest else f"Adds about {r['extra_minutes']} minutes compared with the fastest walk.")) if preferred and r['id']=='0' else 'Shortest estimated walking time, including a 20-second allowance per mapped crossing.'
-    return {'routes':results,'notice':'Accessibility routes prioritize documented features; they are not a guarantee of safety. Listed audible signals are assumed to cover all directions for this prototype.','preferences_applied':preferred,'timezone':'America/Toronto'}
+    for alternative in results:
+        if req.mode=='walk' and alternative['name']=='Alternative walking route':alternative['explanation']='A distinct mapped pedestrian path. Crossing preferences influence this option.' if preferred else 'A distinct mapped pedestrian path with its own estimated walking time.'
+    return {'routes':results[:3],'notice':'Accessibility routes prioritize documented features; they are not a guarantee of safety. Listed audible signals are assumed to cover all directions for this prototype.','preferences_applied':preferred,'timezone':'America/Toronto'}

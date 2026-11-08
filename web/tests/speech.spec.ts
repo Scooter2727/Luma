@@ -181,3 +181,21 @@ test("a tap unlocks the shared audio element for later playback", async ({
     await page.evaluate(() => window.speech.playAiSpeech("After tap.", 1)),
   ).toBe("played");
 });
+
+test("AI speech pauses without timing out and resumes the same audio position", async ({ page }) => {
+  await load(page, true, "audio");
+  await page.route("**/api/speech/synthesize?*", r => r.fulfill({ body: silentWav(4), contentType: "audio/wav" }));
+  await page.evaluate(() => {
+    const w = window as any, NativeAudio = window.Audio;
+    window.Audio = function () { w.shared = new NativeAudio(); return w.shared; } as unknown as typeof Audio;
+    w.finished = false;
+    w.playResult = window.speech.playAiSpeech("A longer instruction.", 1).then(result => { w.finished = true; return result; });
+  });
+  await page.waitForFunction(() => (window as any).shared?.currentTime > 0.05);
+  const position = await page.evaluate(() => { window.speech.pauseAllSpeech(); return (window as any).shared.currentTime; });
+  await page.waitForTimeout(1700);
+  expect(await page.evaluate(() => (window as any).finished)).toBe(false);
+  expect(await page.evaluate(() => (window as any).shared.currentTime)).toBeCloseTo(position, 1);
+  await page.evaluate(() => window.speech.resumeAllSpeech());
+  expect(await page.evaluate(() => (window as any).playResult)).toBe("played");
+});

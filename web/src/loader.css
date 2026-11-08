@@ -28,8 +28,8 @@
   --logo-left: #000;
   --logo-right: #fff;
 }
-[data-theme="contrast"] .luma-mark circle {
-  stroke: #fff;
+:is([data-theme="red-green"], [data-theme="blue-yellow"], [data-theme="contrast"]) .luma-mark circle {
+  stroke: var(--ink);
   stroke-width: 1.5;
 }
 
@@ -96,6 +96,13 @@
   font-weight: 700;
   color: var(--ink);
   text-align: center;
+}
+.luma-loader .luma-loader-back {
+  width: auto;
+  min-width: 160px;
+  min-height: 56px;
+  padding: 12px 24px;
+  font-size: 20px;
 }
 
 @media (prefers-reduced-motion: reduce) {

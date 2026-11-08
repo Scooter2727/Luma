@@ -14,6 +14,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import MapView from "./MapView";
+import { withRouteStyles } from "./routeStyles";
 import Hero from "./Hero";
 import CompassMode from "./compass/CompassMode";
 import { requestCompassAccess } from "./compass/sensors";
@@ -39,6 +40,9 @@ import type { Coord, Feature, Place, Preferences, Route } from "./model";
 import {
   aiSpeechAvailable,
   cancelAllSpeech,
+  pauseAllSpeech,
+  resumeAllSpeech,
+  speechIsPaused,
   loadSpeechStatus,
   refreshSpeechStatus,
   onAiSpeechChange,
@@ -48,6 +52,7 @@ import {
   unlockAiAudio,
 } from "./speech";
 import { LumaLoader } from "./LumaLoader";
+import { useInterfaceSounds } from "./useInterfaceSounds";
 import "./app.css";
 type View =
   | "home"
@@ -103,6 +108,7 @@ export default function App() {
     tactile: saved("tactile-v2", false),
     rate: saved("rate", 1),
     screenReader: saved("screenReader", false),
+    sounds: saved("sounds", true),
     large: saved("large", false),
     theme: localStorage.getItem("luma-theme") || "default",
     directions: saved<string>("directions-style", "left-right") === "both"
@@ -110,6 +116,7 @@ export default function App() {
       : saved("directions-style", "left-right"),
   }));
   const [onboarding, setOnboarding] = useState(false);
+  useInterfaceSounds(prefs.sounds);
   const [showHero, setShowHero] = useState(true);
   const [askOnHome, setAskOnHome] = useState(false);
   const panel = useRef<HTMLDivElement>(null);
@@ -161,6 +168,8 @@ export default function App() {
     );
   const requestNumber = useRef(0),
     lastPlanned = useRef("");
+  const routeAbort = useRef<AbortController | null>(null);
+  useEffect(() => () => routeAbort.current?.abort(), []);
   const keyFor = (target: Place, origin: Place = start) =>
     JSON.stringify([
       origin.coordinates,
@@ -176,6 +185,13 @@ export default function App() {
   currentKey.current = planningKey;
   const route = routes[routeIndex],
     currentStep = route?.steps[step];
+  const comparingRoutes = showOptions && !busy && routes.length > 0 && (view === "routes" || (view === "map" && mapReturn === "routes" && !pickMode));
+  function selectRoute(index: number) {
+    if (index < 0 || index >= Math.min(routes.length, 3)) return;
+    setRouteIndex(index);
+    setSelected(null);
+    setNotice(`Route ${index + 1} selected. ${routes[index].minutes} minutes, ${routes[index].distance} metres.`);
+  }
   const change = (values: Partial<Preferences>) => {
     setPrefs((p) => ({ ...p, ...values }));
   };
@@ -189,23 +205,32 @@ export default function App() {
     return unsubscribe;
   }, []);
   const speechTurn = useRef(0);
-  function deviceSpeak(text: string) {
-    if (!("speechSynthesis" in window)) return;
+  const navigationSpeechActive = useRef(false);
+  const playingRef = useRef(playing);
+  playingRef.current = playing;
+  function deviceSpeak(text: string, done?: (completed: boolean) => void) {
+    if (!("speechSynthesis" in window)) { done?.(false); return; }
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
     u.rate = prefs.rate;
+    u.onend = () => done?.(true);
+    u.onerror = () => done?.(false);
     window.speechSynthesis.speak(u);
+    if (speechIsPaused()) window.speechSynthesis.pause();
   }
   /** aiText is alternative wording for the AI voice only; the notice and device voice always use text. */
-  function speak(text: string, aiText = text) {
+  function speak(text: string, aiText = text, done?: (completed: boolean) => void) {
+    if (!done) { navigationSpeechActive.current = false; setPlaying(false); }
     setNotice(text);
     const turn = ++speechTurn.current;
-    if (prefs.screenReader) return;
+    if (prefs.screenReader) { done?.(false); return; }
     unlockAiAudio();
     window.speechSynthesis?.cancel();
     void playAiSpeech(aiText, prefs.rate).then((outcome) => {
-      if (outcome === "failed" && turn === speechTurn.current)
-        deviceSpeak(text);
+      if (turn !== speechTurn.current) return;
+      const complete = (success: boolean) => { if (turn === speechTurn.current) done?.(success); };
+      if (outcome === "failed") deviceSpeak(text, complete);
+      else complete(outcome === "played");
     });
   }
   function testAiVoice(text: string) {
@@ -253,6 +278,7 @@ export default function App() {
       "tactile-v2": prefs.tactile,
       rate: prefs.rate,
       screenReader: prefs.screenReader,
+      sounds: prefs.sounds,
       large: prefs.large,
       "directions-style": prefs.directions,
     }))
@@ -308,7 +334,7 @@ export default function App() {
     if (onboarding || showHero) return;
     const id = requestAnimationFrame(() => {
       document.getElementById("panel")?.scrollTo({ top: 0 });
-      document.querySelector<HTMLElement>("#panel h1")?.focus();
+      (document.querySelector<HTMLElement>("#panel .luma-loader-back") || document.querySelector<HTMLElement>("#panel h1"))?.focus();
     });
     return () => cancelAnimationFrame(id);
   }, [view, showOptions, showHero, onboarding]);
@@ -336,12 +362,23 @@ export default function App() {
   }, [planningKey, view, showOptions, startValid, endValid]);
   useEffect(() => {
     if (view !== "navigate" || !route || !currentStep) return;
+    playNavigationInstruction();
+    return () => { speechTurn.current++; navigationSpeechActive.current = false; cancelAllSpeech(); };
+  }, [view, step]);
+  function playNavigationInstruction() {
+    if (!route || !currentStep) return;
+    navigationSpeechActive.current = true;
     speak(
       instructionText(currentStep, route.steps[step - 1], prefs.directions),
       aiInstructionText(route, step, prefs.directions),
+      (completed) => {
+        navigationSpeechActive.current = false;
+        if (completed && playingRef.current && !speechIsPaused() && !currentStep.crossing && step < route.steps.length - 1) setStep(step + 1);
+        else setPlaying(false);
+      },
     );
     if (currentStep.crossing) setPlaying(false);
-  }, [view, step]);
+  }
   useEffect(() => {
     if (prefs.screenReader || !aiVoiceReady || !route) return;
     // While choosing, fetch the first two steps so the preview starts instantly; during the
@@ -364,17 +401,6 @@ export default function App() {
     prefs.directions,
     aiVoiceReady,
   ]);
-  useEffect(() => {
-    if (!playing || view !== "navigate" || !route) return;
-    const t = setTimeout(
-      () => {
-        if (step < route.steps.length - 1) setStep((s) => s + 1);
-        else setPlaying(false);
-      },
-      Math.max(6500, ((currentStep?.text.length || 100) * 70) / prefs.rate),
-    );
-    return () => clearTimeout(t);
-  }, [playing, view, step, route, prefs.rate]);
   useEffect(
     () => () => {
       recognition.current?.stop();
@@ -485,6 +511,7 @@ export default function App() {
   }
   function cancelPlanning() {
     requestNumber.current++;
+    routeAbort.current?.abort();
     setBusy(false);
     setShowOptions(false);
     setError("");
@@ -497,6 +524,9 @@ export default function App() {
     }
     const number = ++requestNumber.current,
       key = keyFor(target, origin);
+    routeAbort.current?.abort();
+    const controller = new AbortController();
+    routeAbort.current = controller;
     lastPlanned.current = key;
     setEnd(target);
     setEndValid(true);
@@ -510,6 +540,7 @@ export default function App() {
     setRoutes([]);
     try {
       const d = await request<{ routes: Route[] }>("/api/routes", {
+        signal: controller.signal,
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -528,7 +559,7 @@ export default function App() {
       });
       if (number !== requestNumber.current || key !== currentKey.current)
         return;
-      setRoutes(d.routes);
+      setRoutes(withRouteStyles(d.routes));
       setRouteIndex(0);
       setStep(0);
       setNotice(d.routes.length + " route options found.");
@@ -627,6 +658,7 @@ export default function App() {
         className={
           "app " +
           (onboarding ? "setting-up " : "") +
+          (comparingRoutes ? "comparing " : "") +
           (view === "navigate" ? "navigating" : "")
         }
       >
@@ -680,6 +712,9 @@ export default function App() {
             data={data}
             active={active}
             route={route}
+            alternatives={comparingRoutes ? routes : undefined}
+            selectedIndex={routeIndex}
+            onRouteSelect={comparingRoutes ? selectRoute : undefined}
             pickMode={pickMode}
             onPick={(target, p) => {
               if (target === "start") {
@@ -699,7 +734,7 @@ export default function App() {
               if (view !== "map") showMap(view);
             }}
             focus={view === "navigate" ? currentStep : camera}
-            visible={view === "map"}
+            visible={view === "map" || comparingRoutes}
           />
           {onboarding ? (
             <div className="setup-shell">
@@ -715,6 +750,7 @@ export default function App() {
               className={
                 "panel " +
                 (view === "routes" && showOptions ? "focused-panel " : "") +
+                (view === "routes" && comparingRoutes ? "comparison-panel " : "") +
                 (view === "map" ? "map-panel" : "") +
                 (view === "navigate" ? " navigation-panel" : "")
               }
@@ -727,8 +763,8 @@ export default function App() {
                     : "Luma controls"
               }
             >
-              {!loaded && !onboarding && (
-                <LumaLoader label="Opening Luma…" />
+              {!loaded && !onboarding && !showHero && (
+                <LumaLoader label="Opening Luma…" onBack={() => setShowHero(true)} />
               )}
               <div className="page-content" ref={panel}>
               {view === "home" && (
@@ -801,7 +837,7 @@ export default function App() {
                   <RouteChoices
                     routes={routes}
                     index={routeIndex}
-                    setIndex={setRouteIndex}
+                    setIndex={selectRoute}
                     busy={busy}
                     edit={cancelPlanning}
                     map={() => showMap("routes")}
@@ -857,8 +893,13 @@ export default function App() {
                   prefs={prefs}
                   playing={playing}
                   togglePlaying={() => {
-                    setPlaying(!playing);
-                    if (playing) cancelAllSpeech();
+                    if (playing) { pauseAllSpeech(); setPlaying(false); }
+                    else {
+                      setPlaying(true);
+                      if (navigationSpeechActive.current) resumeAllSpeech();
+                      else if (step === route.steps.length - 1 && step > 0) setStep(0);
+                      else playNavigationInstruction();
+                    }
                   }}
                   speak={speak}
                   next={() => {
@@ -968,7 +1009,7 @@ export default function App() {
                         View data source <ExternalLink size={18} />
                       </a>
                     </div>
-                  ) : !pickMode ? (
+                  ) : !pickMode && !comparingRoutes ? (
                     <details className="map-filters">
                       <summary>
                         <Layers />

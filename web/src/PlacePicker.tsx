@@ -1,6 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { Search, MapPin } from "lucide-react";
-import { LumaLoader } from "./LumaLoader";
+import { Search, MapPin, LoaderCircle } from "lucide-react";
 export type Place = {
   id: string;
   name: string;
@@ -34,7 +33,7 @@ export default function PlacePicker({
     setOpen(false);
   }, [value]);
   useEffect(() => {
-    if (!open) return;
+    if (!open) { setBusy(false); return; }
     setBusy(true);
     const controller = new AbortController();
     const timer = setTimeout(async () => {
@@ -48,6 +47,7 @@ export default function PlacePicker({
         );
         if (!r.ok) throw Error();
         const data = await r.json();
+        if (controller.signal.aborted) return;
         setResults(data);
         setIndex(-1);
       } catch (e) {
@@ -94,6 +94,7 @@ export default function PlacePicker({
           role="combobox"
           aria-expanded={open}
           aria-autocomplete="list"
+          aria-busy={open && busy}
           aria-controls={id + "-results"}
           aria-activedescendant={
             open && results[index] ? id + "-option-" + index : undefined
@@ -125,12 +126,13 @@ export default function PlacePicker({
             }
           }}
         />
-        {busy ? (
-          <LumaLoader label="Searching places…" size={28} />
+        {busy && open ? (
+          <LoaderCircle className="picker-spinner" size={19} aria-hidden="true" />
         ) : (
           <Search size={17} />
         )}
       </div>
+      {open && busy && <span className="sr-only" role="status">Searching places…</span>}
       {open && (
         <div
           className="picker-results"

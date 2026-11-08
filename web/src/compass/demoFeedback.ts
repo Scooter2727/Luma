@@ -1,4 +1,5 @@
 import type { TargetState } from "./targetDemo";
+import { acquirePlaybackSession } from "./audioSession";
 
 export const pulseIntervals = { off: 450, adjust: 1250 };
 type PulseState = "off" | "adjust";
@@ -9,8 +10,7 @@ export class DemoFeedback {
   private mode = "";
   private disposed = false;
   private lastPulse = -Infinity;
-  private session: { type: string } | null = null;
-  private previousSession = "auto";
+  private releaseSession: (() => void) | null = null;
   private onFailure: () => void;
   constructor(onFailure: () => void) {
     this.onFailure = onFailure;
@@ -24,12 +24,7 @@ export class DemoFeedback {
           .webkitAudioContext;
       if (!C || this.disposed) return false;
       // Safari otherwise treats Web Audio as ambient, including silent mode.
-      const session = (navigator as unknown as { audioSession?: { type: string } }).audioSession;
-      if (session && !this.session) {
-        this.session = session;
-        this.previousSession = session.type;
-        try { session.type = "playback"; } catch {}
-      }
+      this.releaseSession ??= acquirePlaybackSession();
       if (this.context && ["closed", "interrupted"].includes(this.context.state)) {
         void this.context.close().catch(() => {});
         this.context = null;
@@ -135,10 +130,8 @@ export class DemoFeedback {
     this.stop();
     void this.context?.close().catch(() => {});
     this.context = null;
-    if (this.session && this.session.type === "playback") {
-      try { this.session.type = this.previousSession; } catch {}
-    }
-    this.session = null;
+    this.releaseSession?.();
+    this.releaseSession = null;
   }
   dispose() {
     this.release();

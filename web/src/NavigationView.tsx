@@ -99,7 +99,7 @@ export default function NavigationView({
       </h1>
       {s.crossing ? (
         <>
-          <button className="crossing-repeat" onClick={() => speak(text, aiText)}>
+          <button className="crossing-repeat" aria-label={`Repeat crossing directions: ${s.street || s.title}`} onClick={() => speak(text, aiText)}>
             <span className="crossing-heading">
               <span className="crossing-label">CROSSING</span>
               <strong>
@@ -110,8 +110,7 @@ export default function NavigationView({
               Check traffic and the signal before crossing.
             </span>
             <span className="repeat-label">
-              <RotateCcw size={30} />
-              Tap anywhere to repeat
+              <RotateCcw size={72} aria-hidden="true" />
             </span>
           </button>
         </>
@@ -135,13 +134,9 @@ export default function NavigationView({
             role="group"
             aria-label="Navigation controls"
           >
-            <button className="repeat-control" onClick={() => speak(text, aiText)}>
-              <RotateCcw size={60} />
-              Repeat
-            </button>
-            <button onClick={togglePlaying}>
+            <button className="playback-control" onClick={togglePlaying} aria-label={playing ? "Pause directions" : "Play directions"}>
               {playing ? <Pause size={60} /> : <Play size={60} />}{" "}
-              {playing ? "Pause" : "Play preview"}
+              {playing ? "Pause" : "Play"}
             </button>
             <button ref={compassButton} className="where-control" onClick={openCompass}>
               <Compass size={60} />
@@ -171,13 +166,13 @@ export default function NavigationView({
           <X size={28} />
           End route
         </button>
-        <button
+        {!s.crossing && <button
           className="icon-button"
           aria-label="Report a problem"
           onClick={report}
         >
           <Flag size={25} />
-        </button>
+        </button>}
       </footer>
     </section>
   );

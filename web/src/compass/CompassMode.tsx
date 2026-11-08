@@ -114,9 +114,7 @@ export default function CompassMode({
       ? compassReason || compassWarning
         ? sensorMessage(compassReason || compassWarning)
         : ""
-      : demo.state === "on"
-        ? `On track · Hold ${Math.ceil((3000 - demo.heldMs) / 1000)} s`
-        : ""
+      : ""
     : "";
   useEffect(() => {
     void requestCompass(entry.permission);

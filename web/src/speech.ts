@@ -17,6 +17,20 @@ let objectUrl = "";
 let unlocked = false;
 let silence = "";
 let finish: ((outcome: AiSpeechOutcome) => void) | null = null;
+let paused = false;
+let pauseAudio: (() => void) | null = null;
+let resumeAudio: (() => void) | null = null;
+export function pauseAllSpeech() {
+  paused = true;
+  pauseAudio?.();
+  globalThis.speechSynthesis?.pause();
+}
+export function resumeAllSpeech() {
+  paused = false;
+  resumeAudio?.();
+  globalThis.speechSynthesis?.resume();
+}
+export function speechIsPaused() { return paused; }
 const blobs = new Map<string, Blob>();
 const pending = new Map<string, Promise<Blob | null>>();
 const listeners = new Set<() => void>();
@@ -144,6 +158,8 @@ export function unlockAiAudio() {
 }
 /** Stop AI audio immediately. Any pending playAiSpeech call resolves "stopped". */
 export function stopAiSpeech() {
+  paused = false;
+  pauseAudio = resumeAudio = null;
   generation++;
   const done = finish;
   finish = null;
@@ -199,10 +215,11 @@ export async function playAiSpeech(
   release();
   if (blob) objectUrl = URL.createObjectURL(blob);
   return new Promise<AiSpeechOutcome>((resolve) => {
-    const timer = setTimeout(() => finish?.("failed"), START_TIMEOUT_MS);
+    let timer: ReturnType<typeof setTimeout> | undefined;
     finish = (outcome) => {
       clearTimeout(timer);
       finish = null;
+      pauseAudio = resumeAudio = null;
       audio.onended = audio.onerror = audio.onplaying = null;
       if (outcome === "failed") {
         recordFailure();
@@ -220,8 +237,15 @@ export async function playAiSpeech(
     audio.onerror = () => finish?.("failed");
     audio.src = objectUrl || synthesisUrl(text);
     audio.defaultPlaybackRate = audio.playbackRate = rate;
-    audio.play().catch(() => {
-      if (id === generation) finish?.("failed");
-    });
+    pauseAudio = () => { clearTimeout(timer); audio.pause(); };
+    resumeAudio = () => {
+      if (paused || id !== generation) return;
+      clearTimeout(timer);
+      timer = setTimeout(() => finish?.("failed"), START_TIMEOUT_MS);
+      audio.play().catch((error: DOMException) => {
+        if (id === generation && !paused && error.name !== "AbortError") finish?.("failed");
+      });
+    };
+    if (!paused) resumeAudio();
   });
 }

@@ -23,7 +23,9 @@ def test_data_and_search():
 
 def test_preferences_change_actual_paths_without_inflating_eta():
     fastest=get_routes()[0]
-    preferred,comparison=get_routes(prefer_audible=True)
+    options=get_routes(prefer_audible=True)
+    preferred=options[0]
+    comparison=next(r for r in options if r['name']=='Fastest walk')
     assert fastest['name']=='Fastest walk'
     assert fastest['coordinates']==comparison['coordinates']
     assert preferred['coordinates']!=fastest['coordinates']
@@ -45,6 +47,36 @@ def test_each_preference_affects_graph_cost(preference):
     g.add_edge('c','b',length=22,crossing=False,audible=False,tactile=False)
     assert nx.shortest_path(g,'a','b',weight=weight())==['a','b']
     assert nx.shortest_path(g,'a','b',weight=weight(**{preference:True}))==['a','c','b']
+
+@pytest.mark.parametrize('count',[1,2,3])
+def test_real_alternatives_are_distinct_connected_and_do_not_modify_network(count):
+    from backend.api import walking_alternatives
+    g=nx.Graph();a=(-79.38,43.65);b=(-79.378,43.65)
+    for i in range(count):
+        middle=(-79.379,43.65+i*.0001)
+        for u,v in [(a,middle),(middle,b)]:
+            g.add_edge(u,v,length=distance(u,v),crossing=False,audible=False,tactile=False)
+    before=g.copy()
+    initial=nx.shortest_path(g,a,b,weight=weight())
+    paths=walking_alternatives(g,a,b,[initial],1.2,dict(audible=False,fewer=False,tactile=False))
+    assert len(paths)==count
+    assert len(set(map(tuple,paths)))==count
+    assert all(path[0]==a and path[-1]==b and nx.is_simple_path(g,path) for path in paths)
+    assert nx.utils.graphs_equal(g,before)
+
+def test_default_walk_returns_up_to_three_real_geometries():
+    routes=get_routes()
+    assert 1<=len(routes)<=3
+    assert len({str(r['coordinates']) for r in routes})==len(routes)
+    assert routes[0]['name']=='Fastest walk'
+    assert all(r['steps'] and r['segments'] and r['minutes']>0 and r['distance']>0 for r in routes)
+
+def test_bus_comparison_keeps_walking_option_within_three_route_limit(monkeypatch):
+    import backend.api as api
+    monkeypatch.setattr(api,'bus_journeys',lambda *args,**kwargs:[dict(mode='bus',steps=[]) for _ in range(3)])
+    routes=get_routes(mode='bus')
+    assert len(routes)==3
+    assert [r['mode'] for r in routes]==['bus','bus','walk']
 
 def test_endpoint_projection_splits_same_edge_and_does_not_mutate_shared_graph():
     net=network();u,v=next((u,v) for u,v in net.edges if distance(u,v)>30)
