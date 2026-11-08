@@ -193,7 +193,7 @@ export function DisplayChoices({
   );
 }
 export function SpeedCard(props: PreferenceProps) {
-  const { prefs, change, speechAvailable, testAiVoice } = props;
+  const { prefs, change, testAiVoice } = props;
   return (
     <section className="speed-card" aria-labelledby="speed-heading">
       <h2 id="speed-heading">Speech speed</h2>
@@ -223,7 +223,7 @@ export function SpeedCard(props: PreferenceProps) {
         </button>
       </div>
       <div className="voice-tests">
-        {speechAvailable && !prefs.screenReader && testAiVoice && (
+        {!prefs.screenReader && testAiVoice && (
           <button
             className="voice-test"
             onClick={() => testAiVoice(SAMPLE_INSTRUCTION)}
@@ -240,8 +240,7 @@ export function SpeedCard(props: PreferenceProps) {
 export function Onboarding(
   props: PreferenceProps & { done: () => void; active?: boolean },
 ) {
-  const { prefs, change, done, active = true, speechAvailable, testAiVoice } =
-    props;
+  const { prefs, change, done, active = true, testAiVoice } = props;
   const [step, setStep] = useState(1);
   const body = useRef<HTMLDivElement>(null);
   useScreenTransition(body, step, active);
@@ -324,10 +323,7 @@ export function Onboarding(
             </svg>
           </div>
         )}
-        {(step === 2 || step === 3) &&
-          !prefs.screenReader &&
-          speechAvailable &&
-          testAiVoice && (
+        {(step === 2 || step === 3) && !prefs.screenReader && testAiVoice && (
             <button
               className="outline-button test-setup"
               onClick={() =>

@@ -208,6 +208,7 @@ export default function App() {
   }
   function testAiVoice(text: string) {
     setNotice(text);
+    if (prefs.screenReader) return;
     const turn = ++speechTurn.current;
     unlockAiAudio();
     window.speechSynthesis?.cancel();
