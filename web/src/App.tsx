@@ -24,7 +24,6 @@ import HomeView from "./HomeView";
 import { JourneyPlanner, RouteChoices } from "./JourneyPlanner";
 import { Onboarding, Settings } from "./Preferences";
 import NavigationView from "./NavigationView";
-import TransitArrivals from "./TransitArrivals";
 import { logoForTheme } from "./brand";
 import ReportView, { ReportHistory } from "./ReportView";
 import type { LocatedPlace } from "./ReportView";
@@ -844,7 +843,7 @@ export default function App() {
                           className="outline-button"
                           onClick={() => void plan(p)}
                         >
-                          <Star size={28} />
+                          <Star size={28} className="saved-star" aria-hidden="true" />
                           {p.name}
                         </button>
                         <button
@@ -1013,21 +1012,13 @@ export default function App() {
                         <X />
                       </button>
                       <h1 tabIndex={-1}>{selected.properties.name}</h1>
-                      {selected.properties.kind === "transit" && <TransitArrivals compact coordinates={selectedPlace.coordinates} />}
                       <button
-                        className="dark-button"
+                        className="outline-button feature-directions"
                         onClick={() => void plan(selectedPlace)}
                       >
                         Directions
                         <ArrowRight />
                       </button>
-                      <a
-                        href={selected.properties.source_url}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        Source <ExternalLink size={18} />
-                      </a>
                       <button
                         className="outline-button"
                         onClick={() => {
@@ -1042,6 +1033,13 @@ export default function App() {
                         <Flag />
                         Report an issue here
                       </button>
+                      <a
+                        href={selected.properties.source_url}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Source <ExternalLink size={18} />
+                      </a>
                     </div>
                   ) : !pickMode && !comparingRoutes ? (
                     <details className="map-filters">

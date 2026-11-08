@@ -58,23 +58,6 @@ export function JourneyPlanner(p: PlannerProps) {
           <MapIcon size={27} />
         </button>
       </header>
-      <div className="endpoint-tools">
-        <button className="schedule-toggle" aria-expanded={scheduling} aria-controls="departure-time" onClick={() => {
-          if (scheduling) { p.setDeparture(""); setScheduling(false); }
-          else setScheduling(true);
-        }}>
-          <CalendarClock size={20} />
-          {scheduling ? "Leave now" : "Schedule"}
-        </button>
-      </div>
-      {scheduling && (
-        <div className="departure-picker">
-          <label className="select-label" id="departure-time">
-            Leave at (Toronto time)
-            <input type="datetime-local" value={p.departure} onChange={e => p.setDeparture(e.target.value)} />
-          </label>
-        </div>
-      )}
       <div className="travel-modes" role="group" aria-label="Travel mode">
         <button aria-pressed={p.mode === "walk"} onClick={() => p.setMode("walk")}>
           <Footprints />
@@ -88,6 +71,17 @@ export function JourneyPlanner(p: PlannerProps) {
       <div className="journey-fields">
         <PlacePicker
           label="From"
+          labelAction={
+            <div className="endpoint-tools">
+              <button className="schedule-toggle" aria-expanded={scheduling} aria-controls="departure-time" onClick={() => {
+                if (scheduling) { p.setDeparture(""); setScheduling(false); }
+                else setScheduling(true);
+              }}>
+                <CalendarClock size={20} />
+                {scheduling ? "Leave now" : "Schedule"}
+              </button>
+            </div>
+          }
           value={p.start}
           onChange={(x) => {
             p.setStart(x);
@@ -95,6 +89,14 @@ export function JourneyPlanner(p: PlannerProps) {
           }}
           onValidityChange={p.setStartValid}
         />
+        {scheduling && (
+          <div className="departure-picker" id="departure-time">
+            <label className="select-label">
+              Leave at (Toronto time)
+              <input type="datetime-local" value={p.departure} onChange={e => p.setDeparture(e.target.value)} />
+            </label>
+          </div>
+        )}
         <PlacePicker
           label="To"
           value={p.end}
@@ -113,7 +115,7 @@ export function JourneyPlanner(p: PlannerProps) {
         <CrossingChoices {...p} />
       </details>
       <button
-        className="dark-button"
+        className="outline-button find-routes"
         disabled={!p.startValid || !p.endValid}
         onClick={p.plan}
       >
@@ -126,7 +128,7 @@ export function JourneyPlanner(p: PlannerProps) {
         disabled={!p.endValid}
         onClick={p.toggleSaved}
       >
-        <Star />
+        <Star className={p.isSaved ? "saved-star" : undefined} aria-hidden="true" />
         {p.isSaved ? "Destination saved" : "Save destination"}
       </button>
       {(!p.startValid || !p.endValid) && (

@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { Search, MapPin, LoaderCircle } from "lucide-react";
 export type Place = {
   id: string;
@@ -9,12 +10,14 @@ export type Place = {
 type Props = {
   query?: string;
   label: string;
+  labelAction?: ReactNode;
   value: Place;
   onChange: (place: Place) => void;
   onValidityChange: (valid: boolean) => void;
 };
 export default function PlacePicker({
   label,
+  labelAction,
   value,
   onChange,
   onValidityChange,
@@ -86,7 +89,10 @@ export default function PlacePicker({
         if (!root.current?.contains(e.relatedTarget as Node)) setOpen(false);
       }}
     >
-      <label htmlFor={id}>{label}</label>
+      <div className="picker-label-row">
+        <label htmlFor={id}>{label}</label>
+        {labelAction}
+      </div>
       <div className="picker-input">
         <MapPin size={19} />
         <input

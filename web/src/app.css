@@ -461,15 +461,24 @@ h1:focus {
   justify-content: flex-start;
   text-align: left;
 }
+.saved-star {
+  fill: #ffd600;
+  stroke: #000;
+}
 .place-picker {
   position: relative;
   min-width: 0;
 }
-.place-picker > label {
-  display: block;
+.picker-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.picker-label-row > label {
   font-size: 20px;
   font-weight: 700;
-  margin-bottom: 8px;
 }
 .picker-input {
   display: flex;
@@ -547,6 +556,7 @@ h1:focus {
 }
 .journey-fields {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
 }
 .endpoint-tools {
@@ -618,6 +628,24 @@ h1:focus {
   border: 2px solid var(--line);
   border-radius: 18px;
   background: var(--surface);
+  min-width: 0;
+  max-width: 100%;
+}
+.departure-picker .select-label {
+  min-width: 0;
+}
+.departure-picker input[type="datetime-local"] {
+  display: block;
+  max-width: 100%;
+  min-inline-size: 0;
+  font-size: 16px;
+}
+.departure-picker input::-webkit-date-and-time-value {
+  min-width: 0;
+  text-align: left;
+}
+.departure-picker input::-webkit-datetime-edit {
+  padding: 0;
 }
 .departure-summary {
   display: flex;
@@ -1885,6 +1913,12 @@ h1:focus {
 }
 .feature-card h1 {
   padding-right: 30px;
+}
+.feature-directions,
+.find-routes {
+  background: var(--mint);
+  color: var(--mint-text);
+  border: 3px solid #000;
 }
 .feature-close {
   position: absolute;

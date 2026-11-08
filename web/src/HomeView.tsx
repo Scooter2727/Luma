@@ -78,7 +78,7 @@ export default function HomeView(p: Props) {
             Type
           </button>
           <button className="outline-button" onClick={p.saved}>
-            <Star size={44} />
+            <Star size={44} className="saved-star" aria-hidden="true" />
             Saved
           </button>
         </div>
