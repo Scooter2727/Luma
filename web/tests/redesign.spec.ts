@@ -3,11 +3,31 @@ import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
 async function boot(page: Page, width = 390, height = 844) {
   await page.setViewportSize({ width, height });
-  await page.addInitScript(() =>
-    localStorage.setItem("luma-onboarding-complete", "true"),
-  );
+  await page.addInitScript(() => {
+    localStorage.setItem("luma-onboarding-complete", "true");
+    class FakeRecognition {
+      lang = "";
+      interimResults = false;
+      onresult: ((e: unknown) => void) | null = null;
+      onerror: (() => void) | null = null;
+      onend: (() => void) | null = null;
+      start() {}
+      stop() {}
+    }
+    const w = window as unknown as {
+      SpeechRecognition?: typeof FakeRecognition;
+      webkitSpeechRecognition?: typeof FakeRecognition;
+    };
+    w.SpeechRecognition = FakeRecognition;
+    w.webkitSpeechRecognition = FakeRecognition;
+  });
   await page.goto("/");
-  await page.getByRole("button", { name: "Try Luma", exact: true }).click();
+  await page.getByRole("button", { name: "Ask Luma", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Where to?", exact: true }),
+  ).toBeVisible();
+  const voice = page.getByRole("button", { name: "Say where to go" });
+  if ((await voice.getAttribute("aria-pressed")) === "true") await voice.click();
 }
 async function audit(page: Page) {
   const result = await new AxeBuilder({ page }).exclude(".map").analyze();
@@ -145,6 +165,13 @@ test("five-step onboarding saves direction, crossing and display choices", async
   ).toBeVisible();
   await page.reload();
   await page.getByRole("button", { name: "Try Luma", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Colour and display", exact: true }),
+  ).toBeVisible();
+  for (let step = 0; step < 4; step++) {
+    await page.getByRole("button", { name: "Next", exact: true }).click();
+  }
+  await page.getByRole("button", { name: "Use Luma", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Where to?", exact: true }),
   ).toBeVisible();
@@ -372,8 +399,28 @@ test("navigation, actual crossing state and reporting keep the current route ste
   await expect(
     page.getByRole("button", { name: "Preview route 1", exact: true }),
   ).toBeFocused();
+  await page.addInitScript(() => {
+    class FakeRecognition {
+      lang = "";
+      interimResults = false;
+      onresult: ((e: unknown) => void) | null = null;
+      onerror: (() => void) | null = null;
+      onend: (() => void) | null = null;
+      start() {}
+      stop() {}
+    }
+    const w = window as unknown as {
+      SpeechRecognition?: typeof FakeRecognition;
+      webkitSpeechRecognition?: typeof FakeRecognition;
+    };
+    w.SpeechRecognition = FakeRecognition;
+    w.webkitSpeechRecognition = FakeRecognition;
+  });
   await page.reload();
-  await page.getByRole("button", { name: "Try Luma", exact: true }).click();
+  await page.getByRole("button", { name: "Ask Luma", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Where to?", exact: true }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByRole("button", { name: "Privacy", exact: true }).click();
   await page

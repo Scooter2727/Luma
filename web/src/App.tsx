@@ -108,9 +108,7 @@ export default function App() {
       ? "cardinal"
       : saved("directions-style", "left-right"),
   }));
-  const [onboarding, setOnboarding] = useState(
-    () => !saved("onboarding-complete", false),
-  );
+  const [onboarding, setOnboarding] = useState(false);
   const [showHero, setShowHero] = useState(true);
   const [askOnHome, setAskOnHome] = useState(false);
   const panel = useRef<HTMLElement>(null);
@@ -612,10 +610,14 @@ export default function App() {
         {showHero && (
           <Hero
             theme={prefs.theme}
-            onTry={() => setShowHero(false)}
+            onTry={() => {
+              setShowHero(false);
+              setOnboarding(true);
+            }}
             onAsk={() => {
               setAskOnHome(true);
               setShowHero(false);
+              setOnboarding(false);
             }}
           />
         )}

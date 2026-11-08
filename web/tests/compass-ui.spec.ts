@@ -54,6 +54,21 @@ async function boot(page: Page, width = 390) {
   await page.addInitScript(() => {
     localStorage.setItem("luma-onboarding-complete", "true");
     localStorage.setItem("luma-screenReader", "true");
+    class FakeRecognition {
+      lang = "";
+      interimResults = false;
+      onresult: ((e: unknown) => void) | null = null;
+      onerror: (() => void) | null = null;
+      onend: (() => void) | null = null;
+      start() {}
+      stop() {}
+    }
+    const wr = window as unknown as {
+      SpeechRecognition?: typeof FakeRecognition;
+      webkitSpeechRecognition?: typeof FakeRecognition;
+    };
+    wr.SpeechRecognition = FakeRecognition;
+    wr.webkitSpeechRecognition = FakeRecognition;
     const state = {
       watches: 0,
       clears: 0,
@@ -94,7 +109,10 @@ async function boot(page: Page, width = 390) {
     r.fulfill({ json: { routes: [route] } }),
   );
   await page.goto("/");
-  await page.getByRole("button", { name: "Try Luma", exact: true }).click();
+  await page.getByRole("button", { name: "Ask Luma", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Where to?", exact: true }),
+  ).toBeVisible();
   await page
     .getByRole("button", { name: "Example journey Try a walk" })
     .click();

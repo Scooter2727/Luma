@@ -18,6 +18,39 @@ async function setup(page: Page, width = 1440, height = 1000) {
     page.getByRole("dialog", { name: "Welcome to Luma", exact: true }),
   ).toHaveCount(0);
 }
+async function reachHome(page: Page, width = 1440, height = 1000) {
+  await page.setViewportSize({ width, height });
+  await page.route("**/api/locations", (r) =>
+    r.fulfill({ json: { features: [] } }),
+  );
+  await page.route("**/api/transit/meta", (r) =>
+    r.fulfill({
+      json: { service_start: "2026-11-01", service_end: "2026-12-21" },
+    }),
+  );
+  await page.addInitScript(() => {
+    class FakeRecognition {
+      lang = "";
+      interimResults = false;
+      onresult: ((e: unknown) => void) | null = null;
+      onerror: (() => void) | null = null;
+      onend: (() => void) | null = null;
+      start() {}
+      stop() {}
+    }
+    const w = window as unknown as {
+      SpeechRecognition?: typeof FakeRecognition;
+      webkitSpeechRecognition?: typeof FakeRecognition;
+    };
+    w.SpeechRecognition = FakeRecognition;
+    w.webkitSpeechRecognition = FakeRecognition;
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Ask Luma", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Where to?", exact: true }),
+  ).toBeVisible();
+}
 test("desktop setup starts with colours over the map and keeps the map mounted after setup", async ({
   page,
 }) => {
@@ -71,7 +104,7 @@ test("walking pace is fixed even when an old saved speed exists", async ({
       json: { detail: "Captured route request" },
     });
   });
-  await setup(page, 390, 844);
+  await reachHome(page, 390, 844);
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByRole("button", { name: "Crossings", exact: true }).click();
   await expect(
