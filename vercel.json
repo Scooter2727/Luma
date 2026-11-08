@@ -14,7 +14,7 @@
       "functions": {
         "backend/app.py": {
           "includeFiles": "data/{WAYFINDER_ALL_LOCATIONS.csv,ttc_stops.csv,sources/{pedestrian-network.geojson,centreline.geojson,ttc-gtfs.zip}}",
-          "excludeFiles": "{node_modules/**,.venv/**,web/**,public/**,dist/**,artifacts/**,data/out/**,backend/test_*.py,.pytest_cache/**,test-results/**,playwright-report/**}"
+          "excludeFiles": "{node_modules/**,.venv/**,web/**,public/**,dist/**,artifacts/**,data/out/**,backend/test_*.py,backend/conftest.py,.pytest_cache/**,test-results/**,playwright-report/**}"
         }
       }
     }

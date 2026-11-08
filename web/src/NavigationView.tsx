@@ -14,14 +14,15 @@ import {
   Flag,
 } from "lucide-react";
 import type { Coord, Preferences, Route } from "./model";
-import { instructionText, saved, timeLabel } from "./model";
+import { aiInstructionText, instructionText, saved, timeLabel } from "./model";
+import { cancelAllSpeech } from "./speech";
 type Props = {
   route: Route;
   step: number;
   prefs: Preferences;
   playing: boolean;
   togglePlaying: () => void;
-  speak: (text: string) => void;
+  speak: (text: string, aiText?: string) => void;
   next: () => void;
   end: () => void;
   where: () => void;
@@ -48,6 +49,7 @@ export default function NavigationView({
   const s = route.steps[step],
     upcoming = route.steps[step + 1];
   const text = instructionText(s, route.steps[step - 1], prefs.directions);
+  const aiText = aiInstructionText(route, step, prefs.directions);
   const summary =
     prefs.directions === "left-right" ? s.title : text.split(". ")[0];
   const isBus = ["wait", "board", "ride", "alight"].includes(s.kind);
@@ -70,7 +72,7 @@ export default function NavigationView({
   }
   function closeCompass() {
     setCompassEntry(null);
-    window.speechSynthesis?.cancel();
+    cancelAllSpeech();
     window.requestAnimationFrame(() => compassButton.current?.focus());
   }
   if (compassEntry)
@@ -93,7 +95,7 @@ export default function NavigationView({
       </h1>
       {s.crossing ? (
         <>
-          <button className="crossing-repeat" onClick={() => speak(text)}>
+          <button className="crossing-repeat" onClick={() => speak(text, aiText)}>
             <span className="crossing-heading">
               <span className="crossing-label">CROSSING</span>
               <strong>
@@ -129,7 +131,7 @@ export default function NavigationView({
             role="group"
             aria-label="Navigation controls"
           >
-            <button className="repeat-control" onClick={() => speak(text)}>
+            <button className="repeat-control" onClick={() => speak(text, aiText)}>
               <RotateCcw size={60} />
               Repeat
             </button>

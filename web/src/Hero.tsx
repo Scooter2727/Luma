@@ -6,7 +6,8 @@ import "./hero.css";
 
 type Props = {
   theme: string;
-  onEnter: () => void;
+  onTry: () => void;
+  onAsk: () => void;
 };
 
 const bubbles = [
@@ -22,6 +23,8 @@ const bubbles = [
   { cls: "o", left: "78%", size: 32, duration: 12, delay: -6 },
   { cls: "g", left: "85%", size: 80, duration: 20, delay: -13 },
   { cls: "b", left: "93%", size: 46, duration: 16, delay: -4 },
+  { cls: "g", left: "49%", size: 22, duration: 11, delay: -7, extra: true },
+  { cls: "o", left: "89%", size: 24, duration: 13, delay: -10, extra: true },
 ];
 
 const easeOut = [0.16, 1, 0.3, 1] as const;
@@ -47,7 +50,7 @@ const caption: Variants = {
   },
 };
 
-export default function Hero({ theme, onEnter }: Props) {
+export default function Hero({ theme, onTry, onAsk }: Props) {
   const reduce = useReducedMotion();
 
   return (
@@ -67,7 +70,9 @@ export default function Hero({ theme, onEnter }: Props) {
         {bubbles.map((b, i) => (
           <span
             key={i}
-            className={"hero-bubble " + b.cls}
+            className={
+              "hero-bubble " + b.cls + (b.extra ? " hero-bubble-extra" : "")
+            }
             style={{
               left: b.left,
               width: b.size,
@@ -86,7 +91,7 @@ export default function Hero({ theme, onEnter }: Props) {
         transition={{ duration: 0.5 }}
       >
         <span className="hero-logo">
-          <img src={logoForTheme(theme)} alt="" width={40} height={40} />
+          <img src={logoForTheme(theme)} alt="" width={44} height={44} />
           <span>Luma</span>
         </span>
       </motion.header>
@@ -102,8 +107,11 @@ export default function Hero({ theme, onEnter }: Props) {
             Directions you can hear.
           </motion.h1>
           <motion.p className="hero-lede" variants={reduce ? undefined : item}>
-            Clock-position guidance at the speed you choose — for blind and
-            low-vision pedestrians in downtown Toronto.
+            Clock-position guidance at the speed you choose.
+            <span className="hero-lede-more">
+              {" "}
+              — for blind and low-vision pedestrians in downtown Toronto.
+            </span>
           </motion.p>
           <motion.div
             className="hero-actions"
@@ -111,20 +119,20 @@ export default function Hero({ theme, onEnter }: Props) {
           >
             <motion.button
               className="hero-btn hero-btn-primary"
-              onClick={onEnter}
+              onClick={onTry}
               whileHover={reduce ? undefined : { scale: 1.03 }}
               whileTap={reduce ? undefined : { scale: 0.97 }}
             >
-              <Play size={26} fill="currentColor" />
+              <Play size={30} fill="currentColor" aria-hidden="true" />
               Try Luma
             </motion.button>
             <motion.button
               className="hero-btn hero-btn-secondary"
-              onClick={onEnter}
+              onClick={onAsk}
               whileHover={reduce ? undefined : { scale: 1.03 }}
               whileTap={reduce ? undefined : { scale: 0.97 }}
             >
-              <Mic size={24} />
+              <Mic size={30} aria-hidden="true" />
               Ask Luma
             </motion.button>
           </motion.div>
@@ -139,8 +147,8 @@ export default function Hero({ theme, onEnter }: Props) {
             <span />
             <span />
             <span />
-            <span />
-            <span />
+            <span className="hero-wave-extra" />
+            <span className="hero-wave-extra" />
           </div>
           <p className="hero-caption-line">
             <span className="hero-type">“In 50 m, toward 3 o'clock.”</span>

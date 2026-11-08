@@ -21,6 +21,7 @@ import type { PreferenceProps } from "./Preferences";
 import type { Place, Route } from "./model";
 import { timeLabel } from "./model";
 import { logoForTheme } from "./brand";
+import { LumaLoader } from "./LumaLoader";
 type PlannerProps = PreferenceProps & {
   start: Place;
   end: Place;
@@ -172,7 +173,7 @@ export function RouteChoices(p: ChoiceProps) {
         </button>
         <h1 tabIndex={-1}>
           {p.busy
-            ? "Finding routes"
+            ? "Finding your way…"
             : r
               ? "Route " + (p.index + 1) + " of " + p.routes.length
               : "No route found"}
@@ -186,10 +187,13 @@ export function RouteChoices(p: ChoiceProps) {
         </button>
       </header>
       {p.busy && (
-        <p className="planning-status" role="status">
-          Calculating paths and directions. The first journey can take longer
-          while the network loads.
-        </p>
+        <div className="planning-status">
+          <LumaLoader label="Finding your way…" />
+          <p>
+            Calculating paths and directions. The first journey can take longer
+            while the network loads.
+          </p>
+        </div>
       )}
       {r && (
         <>

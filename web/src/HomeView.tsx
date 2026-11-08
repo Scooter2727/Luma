@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Mic,
   Keyboard,
@@ -23,11 +23,32 @@ type Props = {
   dictate: (fn: (text: string) => void) => boolean;
   listening: boolean;
   speak: (text: string) => void;
+  askOnHome?: boolean;
+  onAskStarted?: () => void;
 };
 export default function HomeView(p: Props) {
   const [typing, setTyping] = useState(false),
     [query, setQuery] = useState(""),
     [destination, setDestination] = useState(p.end);
+  const askedFromHero = useRef(false);
+  function ask() {
+    if (
+      !p.dictate((text) => {
+        setTyping(true);
+        setQuery(text);
+        p.speak("Choose a destination matching " + text);
+      })
+    ) {
+      setTyping(true);
+      p.speak("Voice input is unavailable. Type your destination.");
+    }
+  }
+  useEffect(() => {
+    if (!p.askOnHome || askedFromHero.current) return;
+    askedFromHero.current = true;
+    p.onAskStarted?.();
+    ask();
+  }, [p.askOnHome]);
   return (
     <>
       <header className="page-header">
@@ -45,18 +66,8 @@ export default function HomeView(p: Props) {
         <button
           className="voice-destination"
           aria-pressed={p.listening}
-          onClick={() => {
-            if (
-              !p.dictate((text) => {
-                setTyping(true);
-                setQuery(text);
-                p.speak("Choose a destination matching " + text);
-              })
-            ) {
-              setTyping(true);
-              p.speak("Voice input is unavailable. Type your destination.");
-            }
-          }}
+          aria-label="Say where to go"
+          onClick={ask}
         >
           <Mic size={68} />
           {p.listening ? "Listening…" : "Say where to go"}

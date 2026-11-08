@@ -22,7 +22,30 @@ export type PreferenceProps = {
   prefs: Preferences;
   change: (values: Partial<Preferences>) => void;
   speak: (text: string) => void;
+  /** The server has AI voice keys configured. */
+  speechAvailable?: boolean;
+  /** AI voice is configured and has not failed repeatedly this session. */
+  aiVoiceReady?: boolean;
+  testAiVoice?: (text: string) => void;
 };
+const SAMPLE_INSTRUCTION =
+  "This is a sample Luma instruction. Turn right onto Queen Street West.";
+export function VoiceEngineStatus({
+  prefs,
+  speechAvailable,
+  aiVoiceReady,
+}: Pick<PreferenceProps, "prefs" | "speechAvailable" | "aiVoiceReady">) {
+  const text = prefs.screenReader
+    ? "Using screen reader announcements"
+    : speechAvailable && aiVoiceReady
+      ? "Using Luma voice"
+      : "Using device voice. Luma voice is unavailable right now.";
+  return (
+    <p className="voice-engine" role="status">
+      {text}
+    </p>
+  );
+}
 export const themes = [
   { id: "default", name: "Luma", colors: ["#5865F2", "#FF8A4C", "#2CCBA8"] },
   {
@@ -167,7 +190,8 @@ export function DisplayChoices({
     </div>
   );
 }
-export function SpeedCard({ prefs, change, speak }: PreferenceProps) {
+export function SpeedCard(props: PreferenceProps) {
+  const { prefs, change, testAiVoice } = props;
   return (
     <section className="speed-card" aria-labelledby="speed-heading">
       <h2 id="speed-heading">Speech speed</h2>
@@ -196,24 +220,25 @@ export function SpeedCard({ prefs, change, speak }: PreferenceProps) {
           <Plus size={38} />
         </button>
       </div>
-      <button
-        className="voice-test"
-        onClick={() =>
-          speak(
-            "This is a sample Luma instruction. Turn right onto Queen Street West.",
-          )
-        }
-      >
-        <Volume2 size={30} />
-        Test voice
-      </button>
+      <div className="voice-tests">
+        {!prefs.screenReader && testAiVoice && (
+          <button
+            className="voice-test"
+            onClick={() => testAiVoice(SAMPLE_INSTRUCTION)}
+          >
+            <Volume2 size={30} />
+            Test Luma voice
+          </button>
+        )}
+      </div>
+      <VoiceEngineStatus {...props} />
     </section>
   );
 }
 export function Onboarding(
   props: PreferenceProps & { done: () => void; active?: boolean },
 ) {
-  const { prefs, change, speak, done, active = true } = props;
+  const { prefs, change, done, active = true, testAiVoice } = props;
   const [step, setStep] = useState(1);
   const body = useRef<HTMLDivElement>(null);
   useScreenTransition(body, step, active);
@@ -284,6 +309,7 @@ export function Onboarding(
                 </label>
               ))}
             </fieldset>
+            <VoiceEngineStatus {...props} />
           </>
         )}
         {step === 3 && <DirectionsChoices {...props} />}{" "}
@@ -295,25 +321,25 @@ export function Onboarding(
             </svg>
           </div>
         )}
-        {(step === 2 || step === 3) && (
-          <button
-            className="outline-button test-setup"
-            onClick={() =>
-              speak(
-                step === 3
-                  ? prefs.directions === "cardinal"
-                    ? "Head northeast along Queen Street. Continue 50 metres."
-                    : prefs.directions === "clock"
-                      ? "Toward 2 o’clock. Continue 50 metres."
-                      : "Turn slightly right. Continue 50 metres."
-                  : "Luma voice guidance. Your next crossing is ahead.",
-              )
-            }
-          >
-            <Volume2 size={32} />
-            Test voice
-          </button>
-        )}
+        {(step === 2 || step === 3) && !prefs.screenReader && testAiVoice && (
+            <button
+              className="outline-button test-setup"
+              onClick={() =>
+                testAiVoice(
+                  step === 3
+                    ? prefs.directions === "cardinal"
+                      ? "Head northeast along Queen Street. Continue 50 metres."
+                      : prefs.directions === "clock"
+                        ? "Toward 2 o’clock. Continue 50 metres."
+                        : "Turn slightly right. Continue 50 metres."
+                    : SAMPLE_INSTRUCTION,
+                )
+              }
+            >
+              <Volume2 size={32} />
+              Test Luma voice
+            </button>
+          )}
         <div className="setup-actions">
           <button
             className="outline-button"
@@ -383,7 +409,11 @@ export function Settings(
           </div>
         </>
       )}
-      {section === "voice" && <SpeedCard {...props} />}{" "}
+      {section === "voice" && (
+        <>
+          <SpeedCard {...props} />
+        </>
+      )}{" "}
       {section === "directions" && <DirectionsChoices {...props} />}
       {section === "crossings" && <CrossingChoices {...props} />}{" "}
       {section === "display" && <DisplayChoices {...props} />}{" "}
@@ -414,6 +444,11 @@ export function Settings(
             GPS and microphone access are requested only when you use those
             controls. Browser speech recognition may use your browser provider’s
             speech service.
+          </p>
+          <p>
+            {props.speechAvailable
+              ? "Luma voice speaks route instructions. Instruction text, including street and destination names, is sent through this prototype’s server to Google Gemini for wording and to ElevenLabs for speech. GPS coordinates are not sent. If Luma voice cannot start, this device’s voice speaks instead."
+              : "Luma voice is not available on this deployment because it has not been configured. This device’s voice is used instead."}
           </p>
           <button className="outline-button" onClick={props.repeatSetup}>
             <SlidersHorizontal />

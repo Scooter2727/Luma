@@ -1,0 +1,83 @@
+.luma-loader {
+  --size: 140px !important;
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--size) * 0.18);
+  background: var(--soft, #f7f8fc);
+}
+
+.luma-mark {
+  width: var(--size);
+  height: var(--size);
+  display: block;
+  overflow: visible;
+  isolation: isolate;
+}
+
+.luma-mark circle {
+  mix-blend-mode: screen;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+@keyframes luma-o {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(0, -22%) scale(0.82);
+  }
+}
+
+@keyframes luma-b {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(-20%, 14%) scale(0.82);
+  }
+}
+
+@keyframes luma-m {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(20%, 14%) scale(0.82);
+  }
+}
+
+.c-orange {
+  animation: luma-o 1.8s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+
+.c-blue {
+  animation: luma-b 1.8s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+
+.c-mint {
+  animation: luma-m 1.8s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+
+.luma-label {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.4;
+  font-weight: 700;
+  color: var(--ink);
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .luma-mark circle {
+    animation: none;
+  }
+}

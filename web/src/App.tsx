@@ -31,9 +31,22 @@ import {
   saved,
   request,
   instructionText,
+  aiInstructionText,
   WALKING_SPEED,
 } from "./model";
 import type { Coord, Feature, Place, Preferences, Route } from "./model";
+import {
+  aiSpeechAvailable,
+  cancelAllSpeech,
+  loadSpeechStatus,
+  refreshSpeechStatus,
+  onAiSpeechChange,
+  playAiSpeech,
+  prefetchAiSpeech,
+  resetAiSpeechSession,
+  unlockAiAudio,
+} from "./speech";
+import { LumaLoader } from "./LumaLoader";
 import "./app.css";
 type View =
   | "home"
@@ -95,8 +108,9 @@ export default function App() {
       ? "cardinal"
       : saved("directions-style", "left-right"),
   }));
-  const [onboarding, setOnboarding] = useState(true);
-  const [showHero, setShowHero] = useState(false);
+  const [onboarding, setOnboarding] = useState(false);
+  const [showHero, setShowHero] = useState(true);
+  const [askOnHome, setAskOnHome] = useState(false);
   const panel = useRef<HTMLDivElement>(null);
   const [homeCompass, setHomeCompass] = useState<{
     permission: Promise<string | null>;
@@ -155,16 +169,61 @@ export default function App() {
   currentKey.current = planningKey;
   const route = routes[routeIndex],
     currentStep = route?.steps[step];
-  const change = (values: Partial<Preferences>) =>
+  const change = (values: Partial<Preferences>) => {
     setPrefs((p) => ({ ...p, ...values }));
-  function speak(text: string) {
+  };
+  const [speechAvailable, setSpeechAvailable] = useState(false),
+    [aiVoiceReady, setAiVoiceReady] = useState(aiSpeechAvailable);
+  useEffect(() => {
+    const unsubscribe = onAiSpeechChange(() =>
+      setAiVoiceReady(aiSpeechAvailable()),
+    );
+    void loadSpeechStatus().then(setSpeechAvailable);
+    return unsubscribe;
+  }, []);
+  const speechTurn = useRef(0);
+  function deviceSpeak(text: string) {
+    if (!("speechSynthesis" in window)) return;
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.rate = prefs.rate;
+    window.speechSynthesis.speak(u);
+  }
+  /** aiText is alternative wording for the AI voice only; the notice and device voice always use text. */
+  function speak(text: string, aiText = text) {
     setNotice(text);
-    if (!prefs.screenReader && "speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(text);
-      u.rate = prefs.rate;
-      window.speechSynthesis.speak(u);
-    }
+    const turn = ++speechTurn.current;
+    if (prefs.screenReader) return;
+    unlockAiAudio();
+    window.speechSynthesis?.cancel();
+    void playAiSpeech(aiText, prefs.rate).then((outcome) => {
+      if (outcome === "failed" && turn === speechTurn.current)
+        deviceSpeak(text);
+    });
+  }
+  function testAiVoice(text: string) {
+    setNotice(text);
+    if (prefs.screenReader) return;
+    const turn = ++speechTurn.current;
+    unlockAiAudio();
+    window.speechSynthesis?.cancel();
+    const runPlay = () =>
+      turn === speechTurn.current
+        ? playAiSpeech(text, prefs.rate)
+        : Promise.resolve("stopped" as const);
+    void (aiSpeechAvailable()
+      ? runPlay()
+      : refreshSpeechStatus().then((available) => {
+          setSpeechAvailable(available);
+          setAiVoiceReady(aiSpeechAvailable());
+          return runPlay();
+        })
+    ).then((outcome) => {
+      if (outcome !== "failed" || turn !== speechTurn.current) return;
+      const fallback = "Luma voice is unavailable right now. " + text;
+      setNotice(fallback);
+      if (!prefs.screenReader) deviceSpeak(fallback);
+    });
   }
   useScreenTransition(
     panel,
@@ -191,7 +250,7 @@ export default function App() {
       "directions-style": prefs.directions,
     }))
       localStorage.setItem("luma-" + key, JSON.stringify(value));
-    if (prefs.screenReader) window.speechSynthesis?.cancel();
+    if (prefs.screenReader) cancelAllSpeech();
   }, [prefs]);
   useEffect(() => {
     const chrome = document.querySelector<HTMLMetaElement>(
@@ -244,9 +303,13 @@ export default function App() {
       document.getElementById("panel")?.scrollTo({ top: 0 });
       document.querySelector<HTMLElement>("#panel h1")?.focus();
     });
-    recognition.current?.stop();
     return () => cancelAnimationFrame(id);
   }, [view, showOptions, showHero, onboarding]);
+  // View changes end dictation. Closing the hero does not, so Ask Luma can start it.
+  useEffect(() => {
+    if (onboarding || showHero) return;
+    recognition.current?.stop();
+  }, [view, showOptions]);
   useEffect(() => {
     if (!startValid || !endValid) {
       requestNumber.current++;
@@ -268,9 +331,32 @@ export default function App() {
     if (view !== "navigate" || !route || !currentStep) return;
     speak(
       instructionText(currentStep, route.steps[step - 1], prefs.directions),
+      aiInstructionText(route, step, prefs.directions),
     );
     if (currentStep.crossing) setPlaying(false);
   }, [view, step]);
+  useEffect(() => {
+    if (prefs.screenReader || !aiVoiceReady || !route) return;
+    // While choosing, fetch the first two steps so the preview starts instantly; during the
+    // preview, fetch only the next step. Re-runs when background rephrasing changes the wording.
+    const upcoming =
+      view === "navigate"
+        ? [step + 1]
+        : view === "routes" && showOptions
+          ? [0, 1]
+          : [];
+    for (const i of upcoming)
+      if (i < route.steps.length)
+        prefetchAiSpeech(aiInstructionText(route, i, prefs.directions));
+  }, [
+    route,
+    step,
+    view,
+    showOptions,
+    prefs.screenReader,
+    prefs.directions,
+    aiVoiceReady,
+  ]);
   useEffect(() => {
     if (!playing || view !== "navigate" || !route) return;
     const t = setTimeout(
@@ -285,7 +371,7 @@ export default function App() {
   useEffect(
     () => () => {
       recognition.current?.stop();
-      window.speechSynthesis?.cancel();
+      cancelAllSpeech();
     },
     [],
   );
@@ -311,7 +397,7 @@ export default function App() {
     };
     r.onend = () => setListening(false);
     try {
-      window.speechSynthesis?.cancel();
+      cancelAllSpeech();
       r.start();
       setListening(true);
       return true;
@@ -430,6 +516,7 @@ export default function App() {
           walking_speed: WALKING_SPEED,
           mode,
           departure_time: departure || null,
+          directions: prefs.directions,
         }),
       });
       if (number !== requestNumber.current || key !== currentKey.current)
@@ -438,13 +525,50 @@ export default function App() {
       setRouteIndex(0);
       setStep(0);
       setNotice(d.routes.length + " route options found.");
+      if (!prefs.screenReader && aiSpeechAvailable())
+        for (const r of d.routes) void rephraseRoute(r, number);
     } catch (e) {
       if (number === requestNumber.current) setError((e as Error).message);
     } finally {
       if (number === requestNumber.current) setBusy(false);
     }
   }
+  /** Replace ai_text with Gemini wording in the background; route planning never waits for it. */
+  async function rephraseRoute(r: Route, number: number) {
+    try {
+      const { texts } = await request<{ texts: string[] }>(
+        "/api/speech/rephrase",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            steps: r.steps.map((s) => ({
+              text: s.ai_text || s.text,
+              street: s.street || null,
+              distance: s.distance,
+              crossing: s.crossing,
+              audible: s.audible ?? null,
+              tactile: s.tactile ?? null,
+            })),
+          }),
+        },
+      );
+      if (number !== requestNumber.current || texts.length !== r.steps.length)
+        return;
+      setRoutes((current) =>
+        current.map((c) =>
+          c.id === r.id
+            ? {
+                ...c,
+                steps: c.steps.map((s, i) => ({ ...s, ai_text: texts[i] })),
+              }
+            : c,
+        ),
+      );
+    } catch {}
+  }
   function startPreview() {
+    if (!prefs.screenReader) unlockAiAudio();
     setStep(0);
     setPlaying(true);
     setLastTrip(end);
@@ -453,7 +577,7 @@ export default function App() {
   }
   function endPreview() {
     setPlaying(false);
-    window.speechSynthesis?.cancel();
+    cancelAllSpeech();
     setView("routes");
     setTimeout(() => document.getElementById("preview-route")?.focus(), 0);
   }
@@ -462,7 +586,14 @@ export default function App() {
     setOnboarding(false);
     setView("home");
   }
-  const prefProps = { prefs, change, speak };
+  const prefProps = {
+    prefs,
+    change,
+    speak,
+    speechAvailable,
+    aiVoiceReady,
+    testAiVoice,
+  };
   const selectedPlace = selected
     ? {
         id: selected.properties.id,
@@ -475,7 +606,18 @@ export default function App() {
     <>
       <AnimatePresence initial={false}>
         {showHero && (
-          <Hero theme={prefs.theme} onEnter={() => setShowHero(false)} />
+          <Hero
+            theme={prefs.theme}
+            onTry={() => {
+              setShowHero(false);
+              setOnboarding(true);
+            }}
+            onAsk={() => {
+              setAskOnHome(true);
+              setShowHero(false);
+              setOnboarding(false);
+            }}
+          />
         )}
       </AnimatePresence>
       <div
@@ -583,6 +725,9 @@ export default function App() {
                     : "Luma controls"
               }
             >
+              {!loaded && !onboarding && (
+                <LumaLoader label="Opening Luma…" />
+              )}
               <div className="page-content" ref={panel}>
               {view === "home" && (
                 <HomeView
@@ -600,6 +745,8 @@ export default function App() {
                   dictate={dictate}
                   listening={listening}
                   speak={speak}
+                  askOnHome={askOnHome}
+                  onAskStarted={() => setAskOnHome(false)}
                 />
               )}
               {view === "saved" && (
@@ -706,7 +853,7 @@ export default function App() {
                   playing={playing}
                   togglePlaying={() => {
                     setPlaying(!playing);
-                    if (playing) window.speechSynthesis?.cancel();
+                    if (playing) cancelAllSpeech();
                   }}
                   speak={speak}
                   next={() => {
@@ -719,7 +866,7 @@ export default function App() {
                   notice={notice}
                   pausePreview={() => {
                     setPlaying(false);
-                    window.speechSynthesis?.cancel();
+                    cancelAllSpeech();
                   }}
                   reroute={(coordinates) => {
                     const origin: Place = {

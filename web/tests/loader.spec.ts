@@ -1,0 +1,41 @@
+import { test, expect } from "@playwright/test";
+
+async function finishOnboarding(page: import("@playwright/test").Page) {
+  await page.getByRole("button", { name: "Try Luma", exact: true }).click();
+  for (let step = 0; step < 4; step++) {
+    await page.getByRole("button", { name: "Next", exact: true }).click();
+  }
+  await page.getByRole("button", { name: "Use Luma", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Where to?", exact: true }),
+  ).toBeVisible();
+}
+
+test("route planning shows the full-screen Luma loader", async ({ page }) => {
+  await page.route("**/api/routes", () => new Promise(() => {}));
+  await page.goto("/");
+  await finishOnboarding(page);
+  await page
+    .getByRole("button", { name: "Example journey Try a walk" })
+    .click();
+  const loader = page
+    .getByRole("status")
+    .filter({ hasText: "Finding your way…" });
+  await expect(loader).toBeVisible();
+  await expect(loader.locator("svg")).toHaveAttribute("aria-hidden", "true");
+});
+
+test("searching for a place shows the full-screen Luma loader", async ({
+  page,
+}) => {
+  await page.route("**/api/search?*", () => new Promise(() => {}));
+  await page.goto("/");
+  await finishOnboarding(page);
+  await page.getByRole("button", { name: "Type", exact: true }).click();
+  await page.getByLabel("Destination").fill("Queen");
+  const loader = page
+    .getByRole("status")
+    .filter({ hasText: "Searching places…" });
+  await expect(loader).toBeVisible();
+  await expect(loader).toHaveClass(/luma-loader/);
+});

@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { Search, MapPin, LoaderCircle } from "lucide-react";
+import { Search, MapPin } from "lucide-react";
+import { LumaLoader } from "./LumaLoader";
 export type Place = {
   id: string;
   name: string;
@@ -125,7 +126,7 @@ export default function PlacePicker({
           }}
         />
         {busy ? (
-          <LoaderCircle size={16} className="loading-icon" />
+          <LumaLoader label="Searching places…" size={28} />
         ) : (
           <Search size={17} />
         )}

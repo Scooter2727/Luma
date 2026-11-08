@@ -6,16 +6,18 @@ from typing import Literal
 import networkx as nx
 from fastapi import FastAPI,HTTPException,Query
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse,StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from pydantic import BaseModel,Field,field_validator
 from .walking import network,distance,walk_details,weight,ROOT
 from .transit import TZ,bus_journeys,feed_range
 from .reports import router as reports_router
+from . import config,speech_audio,speech_keys,speech_phrasing
 
 app=FastAPI(title='Luma',version='0.2.0')
 app.include_router(reports_router)
+app.include_router(speech_keys.router)
 app.add_middleware(CORSMiddleware,allow_origins=['http://localhost:5173','http://127.0.0.1:5173'],allow_methods=['GET','POST','DELETE'],allow_headers=['*'])
 app.add_middleware(GZipMiddleware,minimum_size=1000)
 
@@ -23,7 +25,8 @@ app.add_middleware(GZipMiddleware,minimum_size=1000)
 async def invalid_request(request,exc):
     # Do not echo malformed coordinate values (NaN/Infinity cannot be JSON encoded).
     message='; '.join('.'.join(str(p) for p in e['loc'] if p!='body')+': '+e['msg'] for e in exc.errors())
-    return JSONResponse(status_code=422,content={'detail':'Invalid journey request. '+message})
+    prefix='Invalid speech request. ' if request.url.path.startswith('/api/speech') else 'Invalid journey request. '
+    return JSONResponse(status_code=422,content={'detail':prefix+message})
 def category(row):
     c=row['category']
     if c=='crossing signal':return 'signal'
@@ -77,6 +80,7 @@ class RouteRequest(BaseModel):
     walking_speed:float=Field(1.2,ge=.5,le=2)
     mode:Literal['walk','bus']='walk'
     departure_time:datetime|None=None
+    directions:Literal['clock','left-right','cardinal']='left-right'
     @field_validator('start','end')
     @classmethod
     def coordinate(cls,c):
@@ -97,10 +101,68 @@ def finish_walk(g,path,req,depart,offsets,name,route_id):
     if offsets[1]>1:segments.append(dict(mode='connect',coordinates=[list(path[-1]),list(req.end)]))
     r.update(id=route_id,name=name,mode='walk',minutes=max(1,math.ceil(r['duration_seconds']/60)),distance=round(r['distance']),duration_seconds=math.ceil(r['duration_seconds']),departure_time=depart.isoformat(),arrival_time=datetime.fromtimestamp(depart.timestamp()+r['duration_seconds'],TZ).isoformat(),timing='estimated',snap_distances=[round(n) for n in offsets],segments=segments,coordinates=[list(req.start)]+r['coordinates']+[list(req.end)])
     return r
+SPEECH_UNAVAILABLE='AI voice is unavailable on this server. Luma uses the device voice instead.'
+class SpeechRequest(BaseModel):
+    text:str=Field(min_length=1,max_length=1000)
+    @field_validator('text')
+    @classmethod
+    def nonempty_text(cls,value):
+        if not value.strip():raise ValueError('Enter text to speak.')
+        return value.strip()
+@app.get('/api/speech/status')
+def speech_status():return {'available':config.speech_configured(),'voice':config.voice_version()}
+async def stream_speech(text):
+    if not config.speech_configured():raise HTTPException(503,SPEECH_UNAVAILABLE)
+    stream=await speech_audio.synthesize_stream(text)
+    if stream is None:raise HTTPException(503,'AI voice could not be generated. Luma uses the device voice instead.')
+    return StreamingResponse(stream,media_type='audio/mpeg',headers={'Cache-Control':'no-store'})
+@app.post('/api/speech/synthesize')
+async def synthesize_speech(req:SpeechRequest):return await stream_speech(req.text)
+@app.get('/api/speech/synthesize')
+async def synthesize_speech_url(text:str=Query(min_length=1,max_length=1000)):
+    """GET form so an audio element can start playing while the MP3 is still streaming."""
+    if not text.strip():raise HTTPException(422,'Invalid speech request. text: Enter text to speak.')
+    return await stream_speech(text.strip())
 @app.get('/api/transit/meta')
 def transit_meta():return {'service_start':feed_range()[0],'service_end':feed_range()[1],'timing':'scheduled','timezone':'America/Toronto','max_bus_transfers':1,'max_access_walk_metres':1000}
+COMPASS_POINTS=('north','northeast','east','southeast','south','southwest','west','northwest')
+def number_text(n):return str(int(n)) if float(n).is_integer() else str(n)
+def instruction_text(step,previous,style):
+    """Mirror of web/src/model.ts instructionText(): the sentence the browser would speak."""
+    street=step.get('street') or 'the pedestrian path'
+    if style=='cardinal' and step.get('kind')=='walk' and step.get('bearing') is not None:
+        heading=COMPASS_POINTS[math.floor((step['bearing']%360)/45+.5)%8]
+        return f"Head {heading} along {street}. Continue {number_text(step['distance'])} metres."
+    if style=='left-right' or step.get('kind')!='walk' or step.get('bearing') is None or previous is None or previous.get('bearing') is None:return step['text']
+    delta=(step['bearing']-previous['bearing']+360)%360
+    clock=math.floor(delta/30+.5)%12 or 12
+    return f"Toward {clock} o'clock, along {street}. Continue {number_text(step['distance'])} metres."
+def add_spoken_text(routes,style):
+    """Every step gets ai_text: the sentence to speak in the chosen directions style. The browser may later replace it via /api/speech/rephrase."""
+    for r in routes:
+        r['ai_directions']=style
+        for i,s in enumerate(r['steps']):s['ai_text']=instruction_text(s,r['steps'][i-1] if i else None,style)
+class RephraseStep(BaseModel):
+    text:str=Field(min_length=1,max_length=1000)
+    street:str|None=Field(None,max_length=200)
+    distance:float|None=None
+    crossing:bool=False
+    audible:bool|None=None
+    tactile:bool|None=None
+class RephraseRequest(BaseModel):
+    steps:list[RephraseStep]=Field(min_length=1,max_length=80)
+@app.post('/api/speech/rephrase')
+async def rephrase(req:RephraseRequest):
+    """Natural spoken phrasing for one route. Unconfigured or failed rephrasing returns the original text."""
+    steps=[s.model_dump() for s in req.steps]
+    texts=await speech_phrasing.rephrase_steps(steps) if config.speech_configured() else [s['text'] for s in steps]
+    return {'texts':texts,'rephrased':[a!=s['text'] for a,s in zip(texts,steps)]}
 @app.post('/api/routes')
 def route(req:RouteRequest):
+    response=plan_routes(req)
+    add_spoken_text(response['routes'],req.directions)
+    return response
+def plan_routes(req:RouteRequest):
     if distance(req.start,req.end)<5:raise HTTPException(422,'Start and destination are the same. Choose two different locations.')
     depart=departure(req);net=network()
     try:g,(a,b),offsets=net.query_graph(req.start,req.end)

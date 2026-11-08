@@ -12,6 +12,7 @@ import {
   TrafficCone,
 } from "lucide-react";
 import PlacePicker from "./PlacePicker";
+import { LumaLoader } from "./LumaLoader";
 import { logoForTheme } from "./brand";
 import type { Place } from "./model";
 import { request, saved } from "./model";
@@ -315,6 +316,7 @@ export default function ReportView({
               Reports are saved in Luma for review. They are not automatically sent to the City or used to change routes.
             </p>
           )}
+          {busy && <LumaLoader label="Saving report…" size={72} />}
           <button
             className="dark-button"
             disabled={busy || !valid || !availability.enabled}

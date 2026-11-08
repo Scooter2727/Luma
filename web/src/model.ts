@@ -39,7 +39,9 @@ export type Route = {
     control?: string;
     audible?: boolean | null;
     tactile?: boolean | null;
+    ai_text?: string;
   }[];
+  ai_directions?: Preferences["directions"];
   snap_distances: number[];
   mode: "walk" | "bus";
   departure_time: string;
@@ -195,4 +197,15 @@ export function instructionText(
     clock = Math.round(delta / 30) % 12 || 12;
   const phrase = `Toward ${clock} o'clock, along ${step.street || "the pedestrian path"}. Continue ${step.distance} metres.`;
   return phrase;
+}
+/** Wording for the AI voice. Server ai_text is used only if it was built for the current directions style. */
+export function aiInstructionText(
+  route: Route,
+  index: number,
+  style: Preferences["directions"],
+) {
+  const step = route.steps[index];
+  return route.ai_directions === style && step.ai_text
+    ? step.ai_text
+    : instructionText(step, route.steps[index - 1], style);
 }
