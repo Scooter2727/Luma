@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import type { Coord, Preferences, Route } from "./model";
 import { instructionText, saved, timeLabel } from "./model";
+import { cancelAllSpeech } from "./speech";
 type Props = {
   route: Route;
   step: number;
@@ -70,7 +71,7 @@ export default function NavigationView({
   }
   function closeCompass() {
     setCompassEntry(null);
-    window.speechSynthesis?.cancel();
+    cancelAllSpeech();
     window.requestAnimationFrame(() => compassButton.current?.focus());
   }
   if (compassEntry)

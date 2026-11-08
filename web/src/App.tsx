@@ -34,6 +34,12 @@ import {
   WALKING_SPEED,
 } from "./model";
 import type { Coord, Feature, Place, Preferences, Route } from "./model";
+import {
+  aiSpeechAvailable,
+  cancelAllSpeech,
+  playAiSpeech,
+  stopAiSpeech,
+} from "./speech";
 import "./app.css";
 type View =
   | "home"
@@ -94,6 +100,7 @@ export default function App() {
     directions: saved<string>("directions-style", "left-right") === "both"
       ? "cardinal"
       : saved("directions-style", "left-right"),
+    aiVoice: saved("ai-voice", false),
   }));
   const [onboarding, setOnboarding] = useState(true);
   const [showHero, setShowHero] = useState(false);
@@ -157,14 +164,28 @@ export default function App() {
     currentStep = route?.steps[step];
   const change = (values: Partial<Preferences>) =>
     setPrefs((p) => ({ ...p, ...values }));
+  const speechTurn = useRef(0);
+  function deviceSpeak(text: string) {
+    if (!("speechSynthesis" in window)) return;
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.rate = prefs.rate;
+    window.speechSynthesis.speak(u);
+  }
   function speak(text: string) {
     setNotice(text);
-    if (!prefs.screenReader && "speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(text);
-      u.rate = prefs.rate;
-      window.speechSynthesis.speak(u);
+    const turn = ++speechTurn.current;
+    if (prefs.screenReader) return;
+    if (prefs.aiVoice && aiSpeechAvailable()) {
+      window.speechSynthesis?.cancel();
+      void playAiSpeech(text, prefs.rate).then((outcome) => {
+        if (outcome === "failed" && turn === speechTurn.current)
+          deviceSpeak(text);
+      });
+      return;
     }
+    stopAiSpeech();
+    deviceSpeak(text);
   }
   useScreenTransition(
     panel,
@@ -191,9 +212,10 @@ export default function App() {
       screenReader: prefs.screenReader,
       large: prefs.large,
       "directions-style": prefs.directions,
+      "ai-voice": prefs.aiVoice,
     }))
       localStorage.setItem("luma-" + key, JSON.stringify(value));
-    if (prefs.screenReader) window.speechSynthesis?.cancel();
+    if (prefs.screenReader) cancelAllSpeech();
   }, [prefs]);
   useEffect(() => {
     const chrome = document.querySelector<HTMLMetaElement>(
@@ -287,7 +309,7 @@ export default function App() {
   useEffect(
     () => () => {
       recognition.current?.stop();
-      window.speechSynthesis?.cancel();
+      cancelAllSpeech();
     },
     [],
   );
@@ -313,7 +335,7 @@ export default function App() {
     };
     r.onend = () => setListening(false);
     try {
-      window.speechSynthesis?.cancel();
+      cancelAllSpeech();
       r.start();
       setListening(true);
       return true;
@@ -455,7 +477,7 @@ export default function App() {
   }
   function endPreview() {
     setPlaying(false);
-    window.speechSynthesis?.cancel();
+    cancelAllSpeech();
     setView("routes");
     setTimeout(() => document.getElementById("preview-route")?.focus(), 0);
   }
@@ -708,7 +730,7 @@ export default function App() {
                   playing={playing}
                   togglePlaying={() => {
                     setPlaying(!playing);
-                    if (playing) window.speechSynthesis?.cancel();
+                    if (playing) cancelAllSpeech();
                   }}
                   speak={speak}
                   next={() => {
@@ -721,7 +743,7 @@ export default function App() {
                   notice={notice}
                   pausePreview={() => {
                     setPlaying(false);
-                    window.speechSynthesis?.cancel();
+                    cancelAllSpeech();
                   }}
                   reroute={(coordinates) => {
                     const origin: Place = {

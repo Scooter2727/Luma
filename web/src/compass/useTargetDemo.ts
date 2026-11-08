@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { DemoFeedback } from "./demoFeedback";
 import { TargetDemo } from "./targetDemo";
 import type { TargetSnapshot } from "./targetDemo";
+import { cancelAllSpeech } from "../speech";
 
 export function useTargetDemo(
   source: () => { heading: number | null; reliable: boolean },
@@ -33,7 +34,7 @@ export function useTargetDemo(
   }
   function start() {
     const epoch = ++generation.current;
-    window.speechSynthesis?.cancel();
+    cancelAllSpeech();
     const audio = controller().unlock();
     const sample = latest.current.source();
     game.current = new TargetDemo(sample.heading);
