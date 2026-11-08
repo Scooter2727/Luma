@@ -1324,16 +1324,6 @@ h1:focus {
     max-width: calc(50vw - 28px);
   }
 }
-.compass-fullscreen[data-demo-running="true"] .compass-center {
-  inset: 80px 0 112px;
-}
-.compass-fullscreen[data-demo-running="true"] .compass-face {
-  width: min(78vw, 40dvh, 420px);
-}
-.compass-fullscreen[data-demo-running="true"] .compass-face-status {
-  top: calc(50% + min(39vw, 20dvh, 210px) + 24px);
-  font-size: 20px;
-}
 .compass-fullscreen[data-demo-running="false"] .compass-demo-start {
   background: var(--mint);
   color: var(--mint-text);
@@ -1382,12 +1372,17 @@ h1:focus {
   stroke: var(--demo-on);
   stroke-width: 3;
 }
-.compass-target circle:first-child {
+.compass-target .target-halo {
+  fill: var(--surface);
+  stroke: var(--ink);
+  stroke-width: 3;
+}
+.compass-target .target-disc {
   fill: var(--primary);
   stroke: var(--surface);
   stroke-width: 4;
 }
-.compass-target circle:last-child {
+.compass-target .target-center {
   fill: var(--primary-text);
 }
 .compass-demo-label {
@@ -1433,13 +1428,13 @@ h1:focus {
   --demo-on: #fff;
 }
 @media (max-height: 500px) and (min-width: 600px) {
-  .compass-fullscreen[data-demo-running="true"] .compass-center {
+  .compass-fullscreen .compass-center {
     inset: 80px 180px 12px 0;
   }
-  .compass-fullscreen[data-demo-running="true"] .compass-face {
+  .compass-fullscreen .compass-face {
     width: min(42vw, 62dvh, 320px);
   }
-  .compass-fullscreen[data-demo-running="true"] .compass-face-status {
+  .compass-fullscreen .compass-face-status {
     position: fixed;
     top: 110px;
     right: 20px;

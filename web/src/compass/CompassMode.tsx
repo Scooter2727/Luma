@@ -5,7 +5,6 @@ import type { Route } from "../model";
 import { saved, request } from "../model";
 import { freshFix } from "./orientationEngine";
 import { useTargetDemo } from "./useTargetDemo";
-import { targetLabels } from "./targetDemo";
 import { useCompassDial } from "./useCompassDial";
 import { useScreenTransition } from "../useScreenTransition";
 import {
@@ -105,17 +104,11 @@ export default function CompassMode({
   const demo = targetGame.demo;
   const demoState = demo?.state ?? "idle";
   const targetX = demo
-    ? 160 + 143 * Math.sin((demo.target * Math.PI) / 180)
+    ? 160 + 130 * Math.sin((demo.target * Math.PI) / 180)
     : 0;
   const targetY = demo
-    ? 160 - 143 * Math.cos((demo.target * Math.PI) / 180)
+    ? 160 - 130 * Math.cos((demo.target * Math.PI) / 180)
     : 0;
-  const turn =
-    demo?.difference !== null &&
-    demo?.difference !== undefined &&
-    demo.difference > 0
-      ? "left"
-      : "right";
   const demoStatus = demo
     ? demo.state === "waiting"
       ? compassReason || compassWarning
@@ -123,7 +116,7 @@ export default function CompassMode({
         : ""
       : demo.state === "on"
         ? `On track · Hold ${Math.ceil((3000 - demo.heldMs) / 1000)} s`
-        : `${targetLabels[demo.state]} · Turn phone ${turn}`
+        : ""
     : "";
   useEffect(() => {
     void requestCompass(entry.permission);
@@ -274,8 +267,9 @@ export default function CompassMode({
               ))}
               {demo && (
                 <g className="compass-target">
-                  <circle cx={targetX} cy={targetY} r="12" />
-                  <circle cx={targetX} cy={targetY} r="4" />
+                  <circle className="target-halo" cx={targetX} cy={targetY} r="23" />
+                  <circle className="target-disc" cx={targetX} cy={targetY} r="18" />
+                  <circle className="target-center" cx={targetX} cy={targetY} r="7" />
                 </g>
               )}
             </g>

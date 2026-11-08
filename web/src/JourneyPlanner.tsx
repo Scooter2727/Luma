@@ -57,6 +57,16 @@ export function JourneyPlanner(p: PlannerProps) {
           <MapIcon size={27} />
         </button>
       </header>
+      <div className="travel-modes" role="group" aria-label="Travel mode">
+        <button aria-pressed={p.mode === "walk"} onClick={() => p.setMode("walk")}>
+          <Footprints />
+          Walk
+        </button>
+        <button aria-pressed={p.mode === "bus"} onClick={() => p.setMode("bus")}>
+          <Bus />
+          Bus + walk
+        </button>
+      </div>
       <div className="journey-fields">
         <PlacePicker
           label="From"
@@ -77,7 +87,6 @@ export function JourneyPlanner(p: PlannerProps) {
           onValidityChange={p.setEndValid}
         />
         <div className="endpoint-tools">
-          {p.mode === "bus" && (
             <button className="schedule-toggle" aria-expanded={scheduling} aria-controls="departure-time" onClick={() => {
               if (scheduling) { p.setDeparture(""); setScheduling(false); }
               else setScheduling(true);
@@ -85,26 +94,9 @@ export function JourneyPlanner(p: PlannerProps) {
               <CalendarClock size={20} />
               {scheduling ? "Leave now" : "Schedule"}
             </button>
-          )}
         </div>
       </div>
-      <div className="travel-modes" role="group" aria-label="Travel mode">
-        <button
-          aria-pressed={p.mode === "walk"}
-          onClick={() => p.setMode("walk")}
-        >
-          <Footprints />
-          Walk
-        </button>
-        <button
-          aria-pressed={p.mode === "bus"}
-          onClick={() => p.setMode("bus")}
-        >
-          <Bus />
-          Bus + walk
-        </button>
-      </div>
-      {p.mode === "bus" && scheduling && (
+      {scheduling && (
         <div className="departure-picker">
           {scheduling && <label className="select-label" id="departure-time">
             Leave at (Toronto time)

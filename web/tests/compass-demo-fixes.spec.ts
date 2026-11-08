@@ -1,8 +1,8 @@
 import { test, expect } from "@playwright/test";
 import type { Page } from "@playwright/test";
 
-async function demo(page: Page) {
-  await page.setViewportSize({ width: 390, height: 844 });
+async function demo(page: Page, width = 390, height = 844) {
+  await page.setViewportSize({ width, height });
   await page.addInitScript(() => {
     const w = window as any;
     localStorage.setItem("luma-screenReader", "true");
@@ -26,6 +26,7 @@ async function demo(page: Page) {
   });
   await page.route("**/api/locations", r => r.fulfill({ json: { features: [] } }));
   await page.goto("/");
+  await page.getByRole("button", { name: "Try Luma", exact: true }).click();
   for (let i = 0; i < 4; i++) await page.getByRole("button", { name: "Next", exact: true }).click();
   await page.getByRole("button", { name: "Use Luma", exact: true }).click();
   await page.getByRole("button", { name: "Compass", exact: true }).click();
@@ -44,6 +45,10 @@ async function demo(page: Page) {
     Math.random = () => 0.5;
   });
   await expect(page.locator(".compass-reading strong")).toHaveText("0°");
+  await page.locator(".compass-face").evaluate(el => {
+    const rect = el.getBoundingClientRect();
+    (window as any).beforeDemoBounds = { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+  });
   await page.getByRole("button", { name: "Start demo", exact: true }).click();
   await expect(page.getByRole("button", { name: "Sound on. Mute beeps", exact: true })).toBeVisible();
 }
@@ -99,3 +104,15 @@ test("cardinal letters stay within the dial through a full rotation", async ({ p
     }
   }
 });
+
+for (const [width, height] of [[320, 568], [390, 844], [844, 390], [1440, 1000]]) {
+  test(`demo preserves compass size and position at ${width}x${height}`, async ({ page }) => {
+    await demo(page, width, height);
+    const before = await page.evaluate(() => (window as any).beforeDemoBounds);
+    const during = (await page.locator(".compass-face").boundingBox())!;
+    for (const key of ["x", "y", "width", "height"] as const) expect(during[key]).toBeCloseTo(before[key], 1);
+    await page.getByRole("button", { name: "Stop demo", exact: true }).click();
+    const after = (await page.locator(".compass-face").boundingBox())!;
+    for (const key of ["x", "y", "width", "height"] as const) expect(after[key]).toBeCloseTo(before[key], 1);
+  });
+}

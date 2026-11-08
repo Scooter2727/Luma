@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import * as maplibregl from "maplibre-gl";
 import mapWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { mapIconImages, mapPalette, symbolInk } from "./mapTheme";
+import { mapIconImages, mapPalette } from "./mapTheme";
 import type { Coord, Feature, Route, Place, Step } from "./model";
 maplibregl.setWorkerUrl(mapWorkerUrl);
 type Props = {
@@ -69,39 +69,12 @@ export default function MapView({
       m.addSource("locations", {
         type: "geojson",
         data: { type: "FeatureCollection", features: [] },
-        cluster: true,
-        clusterMaxZoom: 13,
-        clusterRadius: 50,
-      });
-      m.addLayer({
-        id: "clusters",
-        type: "circle",
-        source: "locations",
-        filter: ["has", "point_count"],
-        paint: {
-          "circle-color": "#5865F2",
-          "circle-radius": 15,
-          "circle-stroke-color": "#fff",
-          "circle-stroke-width": 3,
-        },
-      });
-      m.addLayer({
-        id: "cluster-counts",
-        type: "symbol",
-        source: "locations",
-        filter: ["has", "point_count"],
-        layout: {
-          "text-field": ["get", "point_count_abbreviated"],
-          "text-font": ["Noto Sans Regular"],
-          "text-size": 13,
-        },
-        paint: { "text-color": "#ffffff" },
       });
       m.addLayer({
         id: "points",
+        minzoom: 14,
         type: "symbol",
         source: "locations",
-        filter: ["!", ["has", "point_count"]],
         layout: {
           "icon-image": ["get", "kind"],
           "icon-size": [
@@ -171,18 +144,6 @@ export default function MapView({
           });
         }
       });
-      m.on("click", "clusters", async (e) => {
-        const f = e.features?.[0];
-        if (f) {
-          const zoom = await (
-            m.getSource("locations") as maplibregl.GeoJSONSource
-          ).getClusterExpansionZoom(Number(f.properties.cluster_id));
-          m.easeTo({
-            center: (f.geometry as GeoJSON.Point).coordinates as Coord,
-            zoom,
-          });
-        }
-      });
       m.on(
         "mouseenter",
         "points",
@@ -197,7 +158,7 @@ export default function MapView({
         container.current?.setAttribute(
           "data-visible-points",
           String(
-            m.queryRenderedFeatures({ layers: ["points", "clusters"] }).length,
+            m.queryRenderedFeatures({ layers: ["points"] }).length,
           ),
         );
       });
@@ -219,13 +180,6 @@ export default function MapView({
         if (cancelled) return;
         const palette = mapPalette(theme);
         for (const { id, image } of images) m.updateImage(id, image);
-        m.setPaintProperty("clusters", "circle-color", palette.cluster);
-        m.setPaintProperty("clusters", "circle-stroke-color", palette.outline);
-        m.setPaintProperty(
-          "cluster-counts",
-          "text-color",
-          symbolInk(palette.cluster),
-        );
         m.setPaintProperty("route-halo", "line-color", palette.halo);
         m.setPaintProperty("route-line", "line-color", [
           "match",
