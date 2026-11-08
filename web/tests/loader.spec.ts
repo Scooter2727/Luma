@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 
 async function finishOnboarding(page: import("@playwright/test").Page) {
+  await page.getByRole("button", { name: "Try Luma", exact: true }).click();
   for (let step = 0; step < 4; step++) {
     await page.getByRole("button", { name: "Next", exact: true }).click();
   }

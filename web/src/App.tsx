@@ -108,8 +108,11 @@ export default function App() {
       ? "cardinal"
       : saved("directions-style", "left-right"),
   }));
-  const [onboarding, setOnboarding] = useState(true);
-  const [showHero, setShowHero] = useState(false);
+  const [onboarding, setOnboarding] = useState(
+    () => !saved("onboarding-complete", false),
+  );
+  const [showHero, setShowHero] = useState(true);
+  const [askOnHome, setAskOnHome] = useState(false);
   const panel = useRef<HTMLElement>(null);
   const [homeCompass, setHomeCompass] = useState<{
     permission: Promise<string | null>;
@@ -310,9 +313,13 @@ export default function App() {
       document.getElementById("panel")?.scrollTo({ top: 0 });
       document.querySelector<HTMLElement>("#panel h1")?.focus();
     });
-    recognition.current?.stop();
     return () => cancelAnimationFrame(id);
   }, [view, showOptions, showHero, onboarding]);
+  // View changes end dictation. Closing the hero does not, so Ask Luma can start it.
+  useEffect(() => {
+    if (onboarding || showHero) return;
+    recognition.current?.stop();
+  }, [view, showOptions]);
   useEffect(() => {
     if (!startValid || !endValid) {
       requestNumber.current++;
@@ -610,7 +617,14 @@ export default function App() {
     <>
       <AnimatePresence initial={false}>
         {showHero && (
-          <Hero theme={prefs.theme} onEnter={() => setShowHero(false)} />
+          <Hero
+            theme={prefs.theme}
+            onTry={() => setShowHero(false)}
+            onAsk={() => {
+              setAskOnHome(true);
+              setShowHero(false);
+            }}
+          />
         )}
       </AnimatePresence>
       <div
@@ -738,6 +752,8 @@ export default function App() {
                   dictate={dictate}
                   listening={listening}
                   speak={speak}
+                  askOnHome={askOnHome}
+                  onAskStarted={() => setAskOnHome(false)}
                 />
               )}
               {view === "saved" && (

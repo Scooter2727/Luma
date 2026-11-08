@@ -20,6 +20,7 @@ function silentWav(seconds = 0.2, rate = 8000) {
 }
 
 async function finishOnboarding(page: Page) {
+  await page.getByRole("button", { name: "Try Luma", exact: true }).click();
   const useLuma = page.getByRole("button", { name: "Use Luma", exact: true });
   while (!(await useLuma.isVisible())) {
     await page.getByRole("button", { name: "Next" }).click();
