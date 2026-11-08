@@ -11,6 +11,7 @@ import {
 import PlacePicker from "./PlacePicker";
 import { logoForTheme } from "./brand";
 import type { Place } from "./model";
+import { request } from "./model";
 type Props = {
   theme: string;
   end: Place;
@@ -28,16 +29,45 @@ type Props = {
 };
 export default function HomeView(p: Props) {
   const [typing, setTyping] = useState(false),
-    [query, setQuery] = useState(""),
+    [searching, setSearching] = useState(false),
     [destination, setDestination] = useState(p.end);
   const askedFromHero = useRef(false);
+  const destinationSearch = useRef<AbortController | null>(null);
+  useEffect(() => () => destinationSearch.current?.abort(), []);
+  async function chooseSpokenDestination(text: string) {
+    if (!text.trim()) {
+      p.speak("No destination heard. Please try again.");
+      return;
+    }
+    destinationSearch.current?.abort();
+    const controller = new AbortController();
+    destinationSearch.current = controller;
+    setTyping(false);
+    setSearching(true);
+    try {
+      const matches = await request<Place[]>("/api/search?q=" + encodeURIComponent(text.trim()), {
+        signal: controller.signal,
+      });
+      if (controller.signal.aborted) return;
+      if (matches[0]) {
+        setDestination(matches[0]);
+        p.plan(matches[0]);
+      } else {
+        p.speak("No matching destination found. Please try again or type your destination.");
+      }
+    } catch {
+      if (!controller.signal.aborted)
+        p.speak("Destination search is unavailable. Please try again or type your destination.");
+    } finally {
+      if (destinationSearch.current === controller) {
+        destinationSearch.current = null;
+        if (!controller.signal.aborted) setSearching(false);
+      }
+    }
+  }
   function ask() {
     if (
-      !p.dictate((text) => {
-        setTyping(true);
-        setQuery(text);
-        p.speak("Choose a destination matching " + text);
-      })
+      !p.dictate((text) => void chooseSpokenDestination(text))
     ) {
       setTyping(true);
       p.speak("Voice input is unavailable. Type your destination.");
@@ -66,11 +96,13 @@ export default function HomeView(p: Props) {
         <button
           className="voice-destination"
           aria-pressed={p.listening}
+          aria-busy={searching}
+          disabled={searching}
           aria-label="Say where to go"
           onClick={ask}
         >
           <Mic size={68} />
-          {p.listening ? "Listening…" : "Say where to go"}
+          {searching ? "Finding destination…" : p.listening ? "Listening…" : "Say where to go"}
         </button>
         <div className="home-actions">
           <button className="outline-button" onClick={() => setTyping(!typing)}>
@@ -87,7 +119,6 @@ export default function HomeView(p: Props) {
             <PlacePicker
               label="Destination"
               value={destination}
-              query={query}
               onChange={(x) => {
                 setDestination(x);
                 p.plan(x);

@@ -45,6 +45,10 @@ type PlannerProps = PreferenceProps & {
 };
 export function JourneyPlanner(p: PlannerProps) {
   const [scheduling, setScheduling] = useState(!!p.departure);
+  const departureDate = new Date(p.departure);
+  const departureLabel = Number.isNaN(departureDate.getTime())
+    ? "Choose date and time"
+    : departureDate.toLocaleString("en-CA", { dateStyle: "medium", timeStyle: "short" });
   return (
     <>
       <header className="page-header">
@@ -91,10 +95,13 @@ export function JourneyPlanner(p: PlannerProps) {
         />
         {scheduling && (
           <div className="departure-picker" id="departure-time">
-            <label className="select-label">
-              Leave at (Toronto time)
-              <input type="datetime-local" value={p.departure} onChange={e => p.setDeparture(e.target.value)} />
-            </label>
+            <div className="select-label">
+              <label htmlFor="journey-departure">Leave at (Toronto time)</label>
+              <span className="departure-input">
+                <span className="departure-display" aria-hidden="true">{departureLabel}</span>
+                <input id="journey-departure" type="datetime-local" value={p.departure} onChange={e => p.setDeparture(e.target.value)} />
+              </span>
+            </div>
           </div>
         )}
         <PlacePicker

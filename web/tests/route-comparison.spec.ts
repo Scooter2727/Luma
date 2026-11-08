@@ -177,6 +177,36 @@ for (const count of [1, 2, 3])
             return [m.getCenter().lng, m.getCenter().lat, m.getZoom()];
           }),
         ).toEqual(originalCamera);
+        await page.getByRole("button", { name: "Show route on map", exact: true }).click();
+        const picker = page.getByRole("navigation", { name: "Route options", exact: true });
+        await expect(picker).toBeVisible();
+        await expect.poll(() => page.evaluate(() => (window as any).testMap.isMoving())).toBe(false);
+        const mapCamera = await page.evaluate(() => {
+          const m = (window as any).testMap;
+          return [m.getCenter().lng, m.getCenter().lat, m.getZoom()];
+        });
+        // Both directions wrap, selection stays on the map, and Back keeps it.
+        for (const [button, index] of [
+          ["Next route", 2 % count],
+          ["Previous route", 1],
+          ["Previous route", 0],
+          ["Previous route", count - 1],
+          ["Next route", 0],
+          ["Next route", 1],
+        ] as const) {
+          await picker.getByRole("button", { name: button, exact: true }).click();
+          await expect(picker.locator(".map-route-summary span")).toHaveText(`${10 + index} min · ${index + 1} / ${count}`);
+          await expect.poll(() => page.evaluate(async () =>
+            (await (window as any).testMap.getSource("route").getData()).features.find((f: any) => f.properties.emphasized)?.properties.routeIndex,
+          )).toBe(index);
+        }
+        expect(await page.evaluate(() => {
+          const m = (window as any).testMap;
+          return [m.getCenter().lng, m.getCenter().lat, m.getZoom()];
+        })).toEqual(mapCamera);
+        if (theme === "default") await page.screenshot({ path: `artifacts/map-route-arrows-${count}.png` });
+        await page.getByRole("button", { name: "Back", exact: true }).click();
+        await expect(page.getByRole("heading", { name: `Route 2 of ${count}`, exact: true })).toBeVisible();
       }
       if (count === 3) {
         await page.getByRole("button", { name: "Show route on map", exact: true }).click();
@@ -219,6 +249,8 @@ for (const count of [1, 2, 3])
       await expect(page.locator(".instruction-summary")).toHaveText(
         `Walk route ${count}`,
       );
+      await expect(page.getByRole("button", { name: "Report a problem", exact: true })).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "End route", exact: true })).toBeVisible();
       await expect
         .poll(() =>
           page.evaluate(

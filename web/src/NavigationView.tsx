@@ -13,7 +13,6 @@ import {
   Compass,
   ChevronsRight,
   X,
-  Flag,
 } from "lucide-react";
 import type { Coord, Preferences, Route } from "./model";
 import { aiInstructionText, instructionText, saved, timeLabel } from "./model";
@@ -29,7 +28,6 @@ type Props = {
   next: () => void;
   end: () => void;
   where: () => void;
-  report: () => void;
   notice: string;
   pausePreview: () => void;
   reroute: (coordinates: Coord) => void;
@@ -43,7 +41,6 @@ export default function NavigationView({
   togglePlaying,
   speak,
   end,
-  report,
   pausePreview,
 }: Props) {
   const [compassEntry, setCompassEntry] = useState<{
@@ -168,13 +165,6 @@ export default function NavigationView({
           <X size={28} />
           End route
         </button>
-        {!s.crossing && <button
-          className="icon-button"
-          aria-label="Report a problem"
-          onClick={report}
-        >
-          <Flag size={25} />
-        </button>}
       </footer>
     </section>
   );

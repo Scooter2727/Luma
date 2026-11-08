@@ -634,6 +634,15 @@ h1:focus {
 .departure-picker .select-label {
   min-width: 0;
 }
+.departure-input {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+.departure-display {
+  display: none;
+}
 .departure-picker input[type="datetime-local"] {
   display: block;
   max-width: 100%;
@@ -646,6 +655,44 @@ h1:focus {
 }
 .departure-picker input::-webkit-datetime-edit {
   padding: 0;
+}
+@media (pointer: coarse) {
+  /* Keep the native mobile picker, without letting its intrinsic size set the field width. */
+  .departure-input {
+    display: flex;
+    align-items: center;
+    min-height: 58px;
+    padding: 12px;
+    overflow: hidden;
+    border: 3px solid var(--ink);
+    border-radius: 14px;
+    background: var(--surface);
+  }
+  .departure-display {
+    display: block;
+    min-width: 0;
+    font-size: 18px;
+    line-height: 1.4;
+    font-weight: 400;
+    overflow-wrap: anywhere;
+  }
+  .departure-picker .departure-input > input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    opacity: 0;
+    appearance: none;
+    -webkit-appearance: none;
+  }
+  .departure-input:focus-within {
+    outline: 4px solid var(--readable-accent);
+    outline-offset: 3px;
+  }
 }
 .departure-summary {
   display: flex;
@@ -1290,15 +1337,6 @@ h1:focus {
   border-radius: 30px;
   padding: 6px 10px;
 }
-.navigation-footer .icon-button {
-  flex-shrink: 0;
-  width: 72px;
-  min-height: 72px;
-  border: 3px solid var(--accent);
-  border-radius: 18px;
-  background: var(--accent);
-  color: #000;
-}
 .navigation-instruction {
   display: flex;
   align-items: center;
@@ -1746,6 +1784,7 @@ h1:focus {
   display: flex;
   align-items: center;
   justify-content: center;
+  margin-top: clamp(40px, 8dvh, 80px);
   gap: 10px;
   font-size: 20px;
   font-weight: 700;
@@ -1876,6 +1915,37 @@ h1:focus {
   border: 3px solid var(--ink);
   border-radius: 18px;
   max-width: 300px;
+}
+.map-route-picker {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) 64px;
+  align-items: center;
+  gap: 12px;
+  align-self: center;
+  width: min(100%, 480px);
+  margin-top: auto;
+  padding: 12px;
+  background: var(--surface);
+  border: 3px solid var(--ink);
+  border-radius: 24px;
+}
+.map-route-picker .outline-button {
+  min-height: 64px;
+  padding: 8px;
+}
+.map-route-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.map-route-summary strong {
+  font-size: 18px;
+  line-height: 1.2;
+}
+.map-route-summary span {
+  font-size: 16px;
 }
 .map-filters {
   background: var(--surface);

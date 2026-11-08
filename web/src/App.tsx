@@ -8,6 +8,8 @@ import {
   SlidersHorizontal,
   ArrowLeft,
   ArrowRight,
+  ChevronLeft,
+  ChevronRight,
   Star,
   X,
   Layers,
@@ -515,25 +517,6 @@ export default function App() {
     setMapReturn(returnTo);
     setView("map");
   }
-  function openReport() {
-    if (currentStep) {
-      setReportLocation({
-        id: "preview-" + step,
-        name: currentStep.title.includes(" at ")
-          ? currentStep.title.split(" at ").slice(1).join(" at ")
-          : currentStep.street || currentStep.title,
-        subtitle: "Approximate route-preview position",
-        coordinates: currentStep.coordinates,
-        locationSource: "route_preview",
-      });
-      setReportReturn("navigate");
-    } else {
-      setReportLocation({ ...start, locationSource: "selected" });
-      setReportReturn("home");
-    }
-    setPlaying(false);
-    setView("report");
-  }
   function cancelPlanning() {
     requestNumber.current++;
     routeAbort.current?.abort();
@@ -944,7 +927,6 @@ export default function App() {
                   }}
                   end={endPreview}
                   where={() => void whereAmI()}
-                  report={openReport}
                   notice={notice}
                   pausePreview={() => {
                     setPlaying(false);
@@ -1068,6 +1050,28 @@ export default function App() {
                       </div>
                     </details>
                   ) : null}
+                  {comparingRoutes && route && routes.length > 1 && (
+                    <nav className="map-route-picker" aria-label="Route options">
+                      <button
+                        className="outline-button"
+                        aria-label="Previous route"
+                        onClick={() => selectRoute((routeIndex - 1 + routes.length) % routes.length)}
+                      >
+                        <ChevronLeft size={36} aria-hidden="true" />
+                      </button>
+                      <div className="map-route-summary">
+                        <strong>{route.name}</strong>
+                        <span>{route.minutes} min · {routeIndex + 1} / {routes.length}</span>
+                      </div>
+                      <button
+                        className="outline-button"
+                        aria-label="Next route"
+                        onClick={() => selectRoute((routeIndex + 1) % routes.length)}
+                      >
+                        <ChevronRight size={36} aria-hidden="true" />
+                      </button>
+                    </nav>
+                  )}
                 </>
               )}
               {error && (

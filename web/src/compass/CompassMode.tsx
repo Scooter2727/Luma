@@ -73,7 +73,7 @@ export default function CompassMode({
     voice: !demoRunning && saved("compass-voice", true) && !screenReader,
     config: defaults,
     speak: (text: string): void => {
-      if (text.startsWith("Direction uncertain.") && readHeading().heading !== null) return;
+      if (text.startsWith("Direction uncertain.")) return;
       speak(text);
     },
   });
