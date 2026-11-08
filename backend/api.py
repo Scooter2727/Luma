@@ -142,7 +142,7 @@ def transit_arrivals(stop_id:list[str]=Query(default=[]),longitude:float|None=Qu
     ids=list(dict.fromkeys(stop_id))[:4]
     if not ids and longitude is not None and latitude is not None:
         nearby=[]
-        for sid,s in stop_metadata().items():
+        for sid,s in stop_metadata(served=True).items():
             metres=distance((longitude,latitude),(float(s['stop_lon']),float(s['stop_lat'])))
             if metres<=45:nearby.append((metres,sid))
         ids=[sid for _,sid in sorted(nearby)[:3]]

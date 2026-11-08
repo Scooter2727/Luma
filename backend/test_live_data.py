@@ -233,6 +233,23 @@ def test_replacement_bus_is_not_labelled_as_a_streetcar():
     assert vehicle_mode(dict(mode='streetcar'),'East - 504 King')=='streetcar'
 
 
+def test_walking_stop_metadata_does_not_build_the_transit_database(monkeypatch):
+    from backend import transit_data
+    transit_data.stop_metadata.cache_clear()
+    def unexpected():raise AssertionError('Walking must not build the TTC timetable')
+    monkeypatch.setattr(transit_data,'database',unexpected)
+    stops=transit_data.stop_metadata()
+    assert any(s.startswith('surface:') for s in stops)
+    assert any(s.startswith('subway:') for s in stops)
+
+
+def test_complete_transit_index_leaves_room_in_serverless_temporary_storage():
+    from backend.transit_data import database
+    # The previous 410 MB index plus dependency extraction and SQLite sort
+    # spills exceeded the host's temporary disk. Preserve runtime headroom.
+    assert database().stat().st_size < 300*1024*1024
+
+
 @pytest.mark.parametrize('blocked',[False,True])
 def test_transfers_need_a_real_unblocked_walking_connection(monkeypatch,tmp_path,blocked):
     import sqlite3
