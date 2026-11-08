@@ -2,7 +2,8 @@
 import os
 from .runtime import ROOT, is_vercel
 
-DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash'
+# gemini-2.5-flash is no longer offered to new API keys.
+DEFAULT_GEMINI_MODEL = 'gemini-3.8-flash'
 DEFAULT_ELEVENLABS_MODEL_ID = 'eleven_turbo_v2_5'
 # ElevenLabs premade voice "George", available to every account.
 DEFAULT_ELEVENLABS_VOICE_ID = 'JBFqnCBsd6RMkjVDRZzb'
