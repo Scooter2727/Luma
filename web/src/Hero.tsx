@@ -1,13 +1,12 @@
 import { motion, useReducedMotion } from "framer-motion";
 import type { Variants } from "framer-motion";
-import { Play, Mic } from "lucide-react";
+import { Play } from "lucide-react";
 import { logoForTheme } from "./brand";
 import "./hero.css";
 
 type Props = {
   theme: string;
   onTry: () => void;
-  onAsk: () => void;
 };
 
 const bubbles = [
@@ -50,7 +49,7 @@ const caption: Variants = {
   },
 };
 
-export default function Hero({ theme, onTry, onAsk }: Props) {
+export default function Hero({ theme, onTry }: Props) {
   const reduce = useReducedMotion();
 
   return (
@@ -125,15 +124,6 @@ export default function Hero({ theme, onTry, onAsk }: Props) {
             >
               <Play size={30} fill="currentColor" aria-hidden="true" />
               Try Luma
-            </motion.button>
-            <motion.button
-              className="hero-btn hero-btn-secondary"
-              onClick={onAsk}
-              whileHover={reduce ? undefined : { scale: 1.03 }}
-              whileTap={reduce ? undefined : { scale: 0.97 }}
-            >
-              <Mic size={30} aria-hidden="true" />
-              Ask Luma
             </motion.button>
           </motion.div>
         </div>

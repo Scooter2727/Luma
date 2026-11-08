@@ -4,6 +4,7 @@ import type { Page } from "@playwright/test";
 async function demo(page: Page, width = 390, height = 844) {
   await page.setViewportSize({ width, height });
   await page.addInitScript(() => {
+    Object.defineProperty(navigator, "userAgent", { configurable: true, value: "Mozilla/5.0 (iPhone; CPU iPhone OS 26_5 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Safari/604.1" });
     const w = window as any;
     localStorage.setItem("luma-screenReader", "true");
     Object.defineProperty(DeviceOrientationEvent, "requestPermission", { value: () => Promise.resolve("granted"), configurable: true });

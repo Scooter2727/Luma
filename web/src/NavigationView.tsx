@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import CompassMode from "./compass/CompassMode";
 import { requestCompassAccess } from "./compass/sensors";
+import { isDesktopDevice } from "./compass/device";
 import {
   ArrowRight,
   Navigation,
@@ -17,6 +18,7 @@ import type { Coord, Preferences, Route } from "./model";
 import { aiInstructionText, instructionText, saved, timeLabel } from "./model";
 import { cancelAllSpeech } from "./speech";
 type Props = {
+  compassUnavailable: () => void;
   route: Route;
   step: number;
   prefs: Preferences;
@@ -32,6 +34,7 @@ type Props = {
   reroute: (coordinates: Coord) => void;
 };
 export default function NavigationView({
+  compassUnavailable,
   route,
   step,
   prefs,
@@ -61,6 +64,7 @@ export default function NavigationView({
         ? "Arrival"
         : "Next instruction";
   function openCompass() {
+    if (isDesktopDevice()) { compassUnavailable(); return; }
     // iOS motion permission must originate in this tap, not a mount effect.
     const permission = requestCompassAccess();
     pausePreview();

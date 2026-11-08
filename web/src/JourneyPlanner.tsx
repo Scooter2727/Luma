@@ -270,11 +270,11 @@ export function RouteChoices(p: ChoiceProps) {
           </div>
           <button
             id="preview-route"
-            className="dark-button start-route"
+            className="outline-button start-route"
+            aria-label={`Preview route ${p.index + 1}`}
             onClick={p.preview}
           >
-            <Play size={34} />
-            Preview route {p.index + 1}
+            <Play size={40} fill="currentColor" aria-hidden="true" />
           </button>
         </>
       )}

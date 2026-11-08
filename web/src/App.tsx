@@ -17,6 +17,7 @@ import MapView from "./MapView";
 import Hero from "./Hero";
 import CompassMode from "./compass/CompassMode";
 import { requestCompassAccess } from "./compass/sensors";
+import { isDesktopDevice } from "./compass/device";
 import HomeView from "./HomeView";
 import { JourneyPlanner, RouteChoices } from "./JourneyPlanner";
 import { Onboarding, Settings } from "./Preferences";
@@ -112,6 +113,12 @@ export default function App() {
   const [showHero, setShowHero] = useState(true);
   const [askOnHome, setAskOnHome] = useState(false);
   const panel = useRef<HTMLDivElement>(null);
+  const [compassUnavailable, setCompassUnavailable] = useState(false);
+  useEffect(() => {
+    if (!compassUnavailable) return;
+    const timer = window.setTimeout(() => setCompassUnavailable(false), 8000);
+    return () => clearTimeout(timer);
+  }, [compassUnavailable]);
   const [homeCompass, setHomeCompass] = useState<{
     permission: Promise<string | null>;
     trigger: HTMLElement | null;
@@ -612,11 +619,6 @@ export default function App() {
               setShowHero(false);
               setOnboarding(true);
             }}
-            onAsk={() => {
-              setAskOnHome(true);
-              setShowHero(false);
-              setOnboarding(false);
-            }}
           />
         )}
       </AnimatePresence>
@@ -738,10 +740,12 @@ export default function App() {
                   plan={(p) => void plan(p)}
                   map={() => showMap("home")}
                   saved={() => go("saved")}
-                  where={() => setHomeCompass({
+                  where={() => {
+                    if (isDesktopDevice()) { setCompassUnavailable(true); return; }
+                    setHomeCompass({
                     permission: requestCompassAccess(),
                     trigger: document.activeElement as HTMLElement | null,
-                  })}
+                  }); }}
                   dictate={dictate}
                   listening={listening}
                   speak={speak}
@@ -847,6 +851,7 @@ export default function App() {
               )}
               {view === "navigate" && route && (
                 <NavigationView
+                  compassUnavailable={() => setCompassUnavailable(true)}
                   route={route}
                   step={step}
                   prefs={prefs}
@@ -1012,6 +1017,12 @@ export default function App() {
           {notice}
         </div>
       </div>
+      {compassUnavailable && (
+        <div className="compass-notification" role="status">
+          <span>Compass is not available on desktop.</span>
+          <button className="icon-button" aria-label="Dismiss notification" onClick={() => setCompassUnavailable(false)}><X aria-hidden="true" /></button>
+        </div>
+      )}
       {homeCompass && (
         <CompassMode
           route={route}

@@ -741,6 +741,9 @@ h1:focus {
 .start-route {
   min-height: 104px;
   font-size: 26px;
+  background: var(--mint);
+  color: var(--mint-text);
+  border: 3px solid #000;
 }
 .route-explanation {
   font-size: 17px;
@@ -1292,6 +1295,24 @@ h1:focus {
   font-size: 17px;
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+.compass-notification {
+  position: fixed;
+  z-index: 1200;
+  left: 50%;
+  bottom: max(24px, var(--safe-bottom));
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--surface);
+  color: var(--ink);
+  border: 3px solid var(--primary);
+  border-radius: 18px;
+  box-shadow: 0 6px 24px rgb(0 0 0 / 20%);
 }
 .compass-fullscreen {
   --demo-off: #b42318;

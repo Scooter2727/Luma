@@ -1,4 +1,7 @@
 .luma-loader {
+  --logo-top: #ff8a4c;
+  --logo-left: #5865f2;
+  --logo-right: #2ccba8;
   --size: 140px !important;
   position: fixed;
   inset: 0;
@@ -9,6 +12,25 @@
   justify-content: center;
   gap: calc(var(--size) * 0.18);
   background: var(--soft, #f7f8fc);
+}
+[data-theme="red-green"] .luma-loader {
+  --logo-top: #e69f00;
+  --logo-left: #0072b2;
+  --logo-right: #17212f;
+}
+[data-theme="blue-yellow"] .luma-loader {
+  --logo-top: #f0f0eb;
+  --logo-left: #9b3658;
+  --logo-right: #254653;
+}
+[data-theme="contrast"] .luma-loader {
+  --logo-top: #ffd600;
+  --logo-left: #000;
+  --logo-right: #fff;
+}
+[data-theme="contrast"] .luma-mark circle {
+  stroke: #fff;
+  stroke-width: 1.5;
 }
 
 .luma-mark {
