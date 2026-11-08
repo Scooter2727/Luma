@@ -1,23 +1,8 @@
-import { useEffect, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import type { Variants } from "framer-motion";
 import { Play, Mic } from "lucide-react";
 import { logoForTheme } from "./brand";
 import "./hero.css";
-
-function useMinWidth(query: string) {
-  const [matches, setMatches] = useState(
-    () => window.matchMedia(query).matches,
-  );
-  useEffect(() => {
-    const mq = window.matchMedia(query);
-    const sync = () => setMatches(mq.matches);
-    sync();
-    mq.addEventListener("change", sync);
-    return () => mq.removeEventListener("change", sync);
-  }, [query]);
-  return matches;
-}
 
 type Props = {
   theme: string;
@@ -67,7 +52,6 @@ const caption: Variants = {
 
 export default function Hero({ theme, onTry, onAsk }: Props) {
   const reduce = useReducedMotion();
-  const wide = useMinWidth("(min-width: 720px)");
 
   return (
     <motion.div
@@ -124,12 +108,10 @@ export default function Hero({ theme, onTry, onAsk }: Props) {
           </motion.h1>
           <motion.p className="hero-lede" variants={reduce ? undefined : item}>
             Clock-position guidance at the speed you choose.
-            {wide && (
-              <span className="hero-lede-more">
-                {" "}
-                — for blind and low-vision pedestrians in downtown Toronto.
-              </span>
-            )}
+            <span className="hero-lede-more">
+              {" "}
+              — for blind and low-vision pedestrians in downtown Toronto.
+            </span>
           </motion.p>
           <motion.div
             className="hero-actions"
@@ -171,11 +153,9 @@ export default function Hero({ theme, onTry, onAsk }: Props) {
           <p className="hero-caption-line">
             <span className="hero-type">“In 50 m, toward 3 o'clock.”</span>
           </p>
-          {wide && (
-            <p className="hero-caption-sub">
-              onto Queen St W · north side, heading west
-            </p>
-          )}
+          <p className="hero-caption-sub">
+            onto Queen St W · north side, heading west
+          </p>
         </motion.div>
       </motion.main>
     </motion.div>
