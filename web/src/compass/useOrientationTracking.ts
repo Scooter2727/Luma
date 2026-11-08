@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Route } from "../model";
 import {
   defaults,
@@ -88,6 +88,44 @@ export function useOrientationTracking({
     generation = useRef(0);
   const latest = useRef({ simulation, pointing, voice, haptics, speak });
   latest.current = { simulation, pointing, voice, haptics, speak };
+  const northCache = useRef<{ key: string; correction: number | null }>({
+    key: "",
+    correction: null,
+  });
+  // Read sensor samples directly; cache the magnetic model by location/day.
+  const readHeading = useCallback(() => {
+    const now = Date.now(),
+      sample = readings.current.compass,
+      gps = readings.current.fix;
+    if (
+      document.hidden ||
+      !sample ||
+      sample.reason ||
+      sample.magnetic === null ||
+      now - sample.time > 3000
+    )
+      return {
+        heading: null,
+        reliable: false,
+        reference: null as "true" | "magnetic" | null,
+      };
+    let correction: number | null = null;
+    if (gps && freshFix(gps, now)) {
+      const key = `${gps.coordinates.join(",")}:${new Date(now).toISOString().slice(0, 10)}`;
+      if (northCache.current.key !== key)
+        northCache.current = {
+          key,
+          correction: magneticToTrue(0, gps, new Date(now)),
+        };
+      correction = northCache.current.correction;
+    }
+    return {
+      heading: normalize(sample.magnetic + (correction ?? 0)),
+      reliable: !sample.guidanceReason,
+      reference:
+        correction === null ? ("magnetic" as const) : ("true" as const),
+    };
+  }, []);
 
   useEffect(() => {
     readings.current = { fix: null, course: null, compass: null, error: "" };
@@ -197,19 +235,9 @@ export function useOrientationTracking({
       setCompassWarning(rawCompass?.guidanceReason || "");
       // The compass face can show magnetic north without a route/GPS fix.
       // Route corrections below still require all location and confidence checks.
-      if (
-        !sim.enabled &&
-        !document.hidden &&
-        rawCompass &&
-        !rawCompass.reason &&
-        rawCompass.magnetic !== null &&
-        now - rawCompass.time <= 3000
-      ) {
-        const corrected =
-          gps && freshFix(gps, now)
-            ? magneticToTrue(rawCompass.magnetic, gps, new Date(now))
-            : null;
-        const faceHeading = corrected ?? rawCompass.magnetic;
+      const display = readHeading();
+      if (!sim.enabled && display.heading !== null) {
+        const faceHeading = display.heading;
         setRawCompassHeading(faceHeading);
         setCompassHeading((previous) =>
           previous === null
@@ -218,7 +246,7 @@ export function useOrientationTracking({
                 previous + angleDifference(faceHeading, previous) * 0.35,
               ),
         );
-        setNorthReference(corrected === null ? "magnetic" : "true");
+        setNorthReference(display.reference);
       } else {
         setCompassHeading(null);
         setRawCompassHeading(null);
@@ -329,6 +357,7 @@ export function useOrientationTracking({
     result,
     expected,
     compassHeading,
+    readHeading,
     rawCompassHeading,
     compassReason,
     compassWarning,

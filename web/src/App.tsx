@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { AnimatePresence } from "framer-motion";
+import { useScreenTransition } from "./useScreenTransition";
 import {
   Home,
   Route as RouteIcon,
@@ -27,6 +29,7 @@ import {
   saved,
   request,
   instructionText,
+  WALKING_SPEED,
 } from "./model";
 import type { Coord, Feature, Place, Preferences, Route } from "./model";
 import "./app.css";
@@ -82,7 +85,6 @@ export default function App() {
     audible: saved("audible-v2", false),
     fewer: saved("fewer-v2", false),
     tactile: saved("tactile-v2", false),
-    walkingSpeed: saved("walking-speed", 1.2),
     rate: saved("rate", 1),
     screenReader: saved("screenReader", false),
     large: saved("large", false),
@@ -93,6 +95,7 @@ export default function App() {
     () => !saved("onboarding-complete", false),
   );
   const [showHero, setShowHero] = useState(true);
+  const panel = useRef<HTMLElement>(null);
   const [view, setView] = useState<View>("home"),
     [data, setData] = useState<Feature[]>([]),
     [loaded, setLoaded] = useState(false),
@@ -138,7 +141,6 @@ export default function App() {
       prefs.audible,
       prefs.fewer,
       prefs.tactile,
-      prefs.walkingSpeed,
       mode,
       departure,
     ]);
@@ -158,10 +160,16 @@ export default function App() {
       window.speechSynthesis.speak(u);
     }
   }
+  useScreenTransition(
+    panel,
+    `${view}:${showOptions}`,
+    !onboarding && !showHero,
+  );
   useEffect(() => {
     document.documentElement.dataset.theme = prefs.theme;
     document.documentElement.classList.toggle("large-text", prefs.large);
     localStorage.setItem("luma-theme", prefs.theme);
+    localStorage.removeItem("luma-walking-speed");
     const favicon = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
     if (favicon) {
       favicon.type = "image/svg+xml";
@@ -171,7 +179,6 @@ export default function App() {
       "audible-v2": prefs.audible,
       "fewer-v2": prefs.fewer,
       "tactile-v2": prefs.tactile,
-      "walking-speed": prefs.walkingSpeed,
       rate: prefs.rate,
       screenReader: prefs.screenReader,
       large: prefs.large,
@@ -180,6 +187,24 @@ export default function App() {
       localStorage.setItem("luma-" + key, JSON.stringify(value));
     if (prefs.screenReader) window.speechSynthesis?.cancel();
   }, [prefs]);
+  useEffect(() => {
+    const chrome = document.querySelector<HTMLMetaElement>(
+      'meta[name="theme-color"]',
+    );
+    if (chrome)
+      chrome.content =
+        prefs.theme === "contrast"
+          ? "#000000"
+          : showHero
+            ? prefs.theme === "blue-yellow"
+              ? "#f0f0eb"
+              : "#ffffff"
+            : view === "map"
+              ? "#e8ede9"
+              : prefs.theme === "blue-yellow"
+                ? "#e7e8e2"
+                : "#f7f8fc";
+  }, [prefs.theme, view, showHero]);
   useEffect(() => {
     const c = new AbortController();
     request<{ features: Feature[] }>("/api/locations", { signal: c.signal })
@@ -207,13 +232,14 @@ export default function App() {
     localStorage.setItem("luma-saved-places", JSON.stringify(savedPlaces));
   }, [savedPlaces]);
   useEffect(() => {
+    if (onboarding || showHero) return;
     const id = requestAnimationFrame(() => {
       document.getElementById("panel")?.scrollTo({ top: 0 });
       document.querySelector<HTMLElement>("#panel h1")?.focus();
     });
     recognition.current?.stop();
     return () => cancelAnimationFrame(id);
-  }, [view, showOptions]);
+  }, [view, showOptions, showHero, onboarding]);
   useEffect(() => {
     if (!startValid || !endValid) {
       requestNumber.current++;
@@ -394,7 +420,7 @@ export default function App() {
           prefer_audible: prefs.audible,
           fewer_crossings: prefs.fewer,
           prefer_tactile: prefs.tactile,
-          walking_speed: prefs.walkingSpeed,
+          walking_speed: WALKING_SPEED,
           mode,
           departure_time: departure || null,
         }),
@@ -438,377 +464,394 @@ export default function App() {
         coordinates: selected.geometry.coordinates,
       }
     : null;
-  if (onboarding)
-    return (
-      <>
+  return (
+    <>
+      <AnimatePresence initial={false}>
         {showHero && (
           <Hero theme={prefs.theme} onEnter={() => setShowHero(false)} />
         )}
-        <div className="setup-shell">
-          <Onboarding {...prefProps} done={completeSetup} />
-          <div className="sr-only" role="status">
-            {notice}
-          </div>
-        </div>
-      </>
-    );
-  return (
-    <>
-      {showHero && (
-        <Hero theme={prefs.theme} onEnter={() => setShowHero(false)} />
-      )}
-      <div className={"app " + (view === "navigate" ? "navigating" : "")}>
-      <a className="skip" href="#panel">
-        Skip map to controls
-      </a>
-      <nav
-        className="main-nav"
-        aria-label="Main"
-        hidden={view === "navigate" || (view === "routes" && showOptions)}
+      </AnimatePresence>
+      <div
+        inert={showHero}
+        className={
+          "app " +
+          (onboarding ? "setting-up " : "") +
+          (view === "navigate" ? "navigating" : "")
+        }
       >
-        <a
-          className="brand"
-          href="#"
-          aria-label="Luma home"
-          onClick={(e) => {
-            e.preventDefault();
-            go("home");
-          }}
-        >
-          <img src={logoForTheme(prefs.theme)} alt="" />
-          <span>Luma</span>
+        <a className="skip" href="#panel" hidden={onboarding}>
+          Skip map to controls
         </a>
-        {(
-          [
-            { id: "home", label: "Home", icon: Home },
-            { id: "routes", label: "Routes", icon: RouteIcon },
-            { id: "report", label: "Report", icon: Flag },
-            { id: "settings", label: "Settings", icon: SlidersHorizontal },
-          ] as const
-        ).map((n) => (
-          <button
-            key={n.id}
-            className={view === n.id ? "active" : ""}
-            aria-current={view === n.id ? "page" : undefined}
-            onClick={() => go(n.id)}
-          >
-            <n.icon size={32} />
-            {n.label}
-          </button>
-        ))}
-      </nav>
-      <main className="workspace">
-        <MapView
-          theme={prefs.theme}
-          data={data}
-          active={active}
-          route={route}
-          pickMode={pickMode}
-          onPick={(target, p) => {
-            if (target === "start") {
-              setStart(p);
-              setStartValid(true);
-            } else {
-              setEnd(p);
-              setEndValid(true);
-            }
-            setPickMode(null);
-            setView("routes");
-            setShowOptions(false);
-            setNotice("Map point selected.");
-          }}
-          onSelect={(f) => {
-            setSelected(f);
-            if (view !== "map") showMap(view);
-          }}
-          focus={view === "navigate" ? currentStep : camera}
-          visible={view === "map"}
-        />
-        <section
-          id="panel"
-          className={
-            "panel " +
-            (view === "routes" && showOptions ? "focused-panel " : "") +
-            (view === "map" ? "map-panel" : "") +
-            (view === "navigate" ? " navigation-panel" : "")
-          }
-          data-loaded={loaded}
-          aria-label={
-            view === "navigate"
-              ? "Navigation"
-              : view === "map"
-                ? "Map controls"
-                : "Luma controls"
+        <nav
+          className="main-nav"
+          aria-label="Main"
+          hidden={
+            onboarding ||
+            view === "navigate" ||
+            (view === "routes" && showOptions)
           }
         >
-          {view === "home" && (
-            <HomeView
-              theme={prefs.theme}
-              end={end}
-              lastTrip={lastTrip}
-              example={initialEnd}
-              plan={(p) => void plan(p)}
-              map={() => showMap("home")}
-              saved={() => go("saved")}
-              where={() => void whereAmI()}
-              dictate={dictate}
-              listening={listening}
-              speak={speak}
-            />
-          )}
-          {view === "saved" && (
-            <>
-              <header className="page-header">
-                <button
-                  className="back-button"
-                  aria-label="Back home"
-                  onClick={() => go("home")}
+          <a
+            className="brand"
+            href="#"
+            aria-label="Luma home"
+            onClick={(e) => {
+              e.preventDefault();
+              go("home");
+            }}
+          >
+            <img src={logoForTheme(prefs.theme)} alt="" />
+            <span>Luma</span>
+          </a>
+          {(
+            [
+              { id: "home", label: "Home", icon: Home },
+              { id: "routes", label: "Routes", icon: RouteIcon },
+              { id: "report", label: "Report", icon: Flag },
+              { id: "settings", label: "Settings", icon: SlidersHorizontal },
+            ] as const
+          ).map((n) => (
+            <button
+              key={n.id}
+              className={view === n.id ? "active" : ""}
+              aria-current={view === n.id ? "page" : undefined}
+              onClick={() => go(n.id)}
+            >
+              <n.icon size={32} />
+              {n.label}
+            </button>
+          ))}
+        </nav>
+        <main className="workspace">
+          <MapView
+            decorative={onboarding || showHero}
+            theme={prefs.theme}
+            data={data}
+            active={active}
+            route={route}
+            pickMode={pickMode}
+            onPick={(target, p) => {
+              if (target === "start") {
+                setStart(p);
+                setStartValid(true);
+              } else {
+                setEnd(p);
+                setEndValid(true);
+              }
+              setPickMode(null);
+              setView("routes");
+              setShowOptions(false);
+              setNotice("Map point selected.");
+            }}
+            onSelect={(f) => {
+              setSelected(f);
+              if (view !== "map") showMap(view);
+            }}
+            focus={view === "navigate" ? currentStep : camera}
+            visible={view === "map"}
+          />
+          {onboarding ? (
+            <div className="setup-shell">
+              <Onboarding
+                {...prefProps}
+                active={!showHero}
+                done={completeSetup}
+              />
+            </div>
+          ) : (
+            <section
+              ref={panel}
+              id="panel"
+              className={
+                "panel " +
+                (view === "routes" && showOptions ? "focused-panel " : "") +
+                (view === "map" ? "map-panel" : "") +
+                (view === "navigate" ? " navigation-panel" : "")
+              }
+              data-loaded={loaded}
+              aria-label={
+                view === "navigate"
+                  ? "Navigation"
+                  : view === "map"
+                    ? "Map controls"
+                    : "Luma controls"
+              }
+            >
+              {view === "home" && (
+                <HomeView
+                  theme={prefs.theme}
+                  end={end}
+                  lastTrip={lastTrip}
+                  example={initialEnd}
+                  plan={(p) => void plan(p)}
+                  map={() => showMap("home")}
+                  saved={() => go("saved")}
+                  where={() => void whereAmI()}
+                  dictate={dictate}
+                  listening={listening}
+                  speak={speak}
+                />
+              )}
+              {view === "saved" && (
+                <>
+                  <header className="page-header">
+                    <button
+                      className="back-button"
+                      aria-label="Back home"
+                      onClick={() => go("home")}
+                    >
+                      <ArrowLeft />
+                    </button>
+                    <h1 tabIndex={-1}>Saved places</h1>
+                  </header>
+                  {savedPlaces.length ? (
+                    savedPlaces.map((p) => (
+                      <div className="saved-place" key={p.id}>
+                        <button
+                          className="outline-button"
+                          onClick={() => void plan(p)}
+                        >
+                          <Star size={28} />
+                          {p.name}
+                        </button>
+                        <button
+                          className="icon-button"
+                          aria-label={"Remove " + p.name}
+                          onClick={() =>
+                            setSavedPlaces((s) =>
+                              s.filter((x) => x.id !== p.id),
+                            )
+                          }
+                        >
+                          <X />
+                        </button>
+                      </div>
+                    ))
+                  ) : (
+                    <p>
+                      Save a destination from the journey planner to find it
+                      here.
+                    </p>
+                  )}
+                </>
+              )}
+              {view === "routes" &&
+                (showOptions ? (
+                  <RouteChoices
+                    routes={routes}
+                    index={routeIndex}
+                    setIndex={setRouteIndex}
+                    busy={busy}
+                    edit={cancelPlanning}
+                    map={() => showMap("routes")}
+                    speak={speak}
+                    preview={startPreview}
+                  />
+                ) : (
+                  <JourneyPlanner
+                    {...prefProps}
+                    start={start}
+                    end={end}
+                    setStart={setStart}
+                    setEnd={setEnd}
+                    startValid={startValid}
+                    endValid={endValid}
+                    setStartValid={setStartValid}
+                    setEndValid={setEndValid}
+                    mode={mode}
+                    setMode={setMode}
+                    departure={departure}
+                    setDeparture={setDeparture}
+                    timetable={timetable}
+                    locate={() => void locateStart()}
+                    map={(target) => {
+                      setPickMode(target || null);
+                      setSelected(null);
+                      showMap("routes");
+                    }}
+                    plan={() => void plan()}
+                    isSaved={savedPlaces.some((p) => p.id === end.id)}
+                    toggleSaved={() =>
+                      setSavedPlaces((places) =>
+                        places.some((p) => p.id === end.id)
+                          ? places.filter((p) => p.id !== end.id)
+                          : [end, ...places],
+                      )
+                    }
+                  />
+                ))}
+              {view === "settings" && (
+                <Settings
+                  {...prefProps}
+                  repeatSetup={() => setOnboarding(true)}
                 >
-                  <ArrowLeft />
-                </button>
-                <h1 tabIndex={-1}>Saved places</h1>
-              </header>
-              {savedPlaces.length ? (
-                savedPlaces.map((p) => (
-                  <div className="saved-place" key={p.id}>
+                  <ReportHistory />
+                </Settings>
+              )}
+              {view === "navigate" && route && (
+                <NavigationView
+                  route={route}
+                  step={step}
+                  prefs={prefs}
+                  playing={playing}
+                  togglePlaying={() => {
+                    setPlaying(!playing);
+                    if (playing) window.speechSynthesis?.cancel();
+                  }}
+                  speak={speak}
+                  next={() => {
+                    setPlaying(false);
+                    setStep((i) => Math.min(route.steps.length - 1, i + 1));
+                  }}
+                  end={endPreview}
+                  where={() => void whereAmI()}
+                  report={openReport}
+                  notice={notice}
+                  pausePreview={() => {
+                    setPlaying(false);
+                    window.speechSynthesis?.cancel();
+                  }}
+                  reroute={(coordinates) => {
+                    const origin: Place = {
+                      id: "current",
+                      name: "Your location",
+                      subtitle: "Compass GPS location",
+                      coordinates,
+                    };
+                    setStart(origin);
+                    setStartValid(true);
+                    void plan(undefined, origin);
+                  }}
+                />
+              )}
+              {view === "report" && (
+                <ReportView
+                  key={reportLocation.id}
+                  initialLocation={reportLocation}
+                  back={() => setView(reportReturn)}
+                  backLabel={
+                    reportReturn === "navigate"
+                      ? "Back to route"
+                      : reportReturn === "map"
+                        ? "Back to map"
+                        : null
+                  }
+                  locate={getLocation}
+                  dictate={dictate}
+                  listening={listening}
+                  speak={speak}
+                />
+              )}
+              {view === "map" && (
+                <>
+                  <div className="map-toolbar">
                     <button
                       className="outline-button"
-                      onClick={() => void plan(p)}
+                      onClick={() => {
+                        setPickMode(null);
+                        setView(mapReturn);
+                      }}
                     >
-                      <Star size={28} />
-                      {p.name}
+                      <ArrowLeft />
+                      Back
                     </button>
-                    <button
-                      className="icon-button"
-                      aria-label={"Remove " + p.name}
-                      onClick={() =>
-                        setSavedPlaces((s) => s.filter((x) => x.id !== p.id))
-                      }
-                    >
-                      <X />
-                    </button>
+                    {pickMode && (
+                      <p role="status">
+                        Tap the map to choose your{" "}
+                        {pickMode === "start" ? "start" : "destination"}.
+                      </p>
+                    )}
                   </div>
-                ))
-              ) : (
-                <p>
-                  Save a destination from the journey planner to find it here.
-                </p>
+                  {selected && selectedPlace ? (
+                    <div className="feature-card">
+                      <button
+                        className="icon-button feature-close"
+                        aria-label="Close location details"
+                        onClick={() => setSelected(null)}
+                      >
+                        <X />
+                      </button>
+                      <h1 tabIndex={-1}>{selected.properties.name}</h1>
+                      <p>{selected.properties.purpose}</p>
+                      <p className="helper">
+                        {selected.properties.location_precision}
+                      </p>
+                      <button
+                        className="dark-button"
+                        onClick={() => void plan(selectedPlace)}
+                      >
+                        Directions here
+                        <ArrowRight />
+                      </button>
+                      <button
+                        className="outline-button"
+                        onClick={() => {
+                          setReportLocation({
+                            ...selectedPlace,
+                            locationSource: "selected",
+                          });
+                          setReportReturn("map");
+                          setView("report");
+                        }}
+                      >
+                        <Flag />
+                        Report an issue here
+                      </button>
+                      <a
+                        href={selected.properties.source_url}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        View data source <ExternalLink size={18} />
+                      </a>
+                    </div>
+                  ) : !pickMode ? (
+                    <details className="map-filters">
+                      <summary>
+                        <Layers />
+                        Map features
+                      </summary>
+                      <div>
+                        {kinds.map((k) => (
+                          <label key={k.id}>
+                            <input
+                              type="checkbox"
+                              checked={active.includes(k.id)}
+                              onChange={(e) =>
+                                setActive((a) =>
+                                  e.target.checked
+                                    ? [...a, k.id]
+                                    : a.filter((x) => x !== k.id),
+                                )
+                              }
+                            />
+                            <k.icon size={24} />
+                            {k.name}
+                          </label>
+                        ))}
+                      </div>
+                    </details>
+                  ) : null}
+                </>
               )}
-            </>
-          )}
-          {view === "routes" &&
-            (showOptions ? (
-              <RouteChoices
-                routes={routes}
-                index={routeIndex}
-                setIndex={setRouteIndex}
-                busy={busy}
-                edit={cancelPlanning}
-                map={() => showMap("routes")}
-                speak={speak}
-                preview={startPreview}
-              />
-            ) : (
-              <JourneyPlanner
-                {...prefProps}
-                start={start}
-                end={end}
-                setStart={setStart}
-                setEnd={setEnd}
-                startValid={startValid}
-                endValid={endValid}
-                setStartValid={setStartValid}
-                setEndValid={setEndValid}
-                mode={mode}
-                setMode={setMode}
-                departure={departure}
-                setDeparture={setDeparture}
-                timetable={timetable}
-                locate={() => void locateStart()}
-                map={(target) => {
-                  setPickMode(target || null);
-                  setSelected(null);
-                  showMap("routes");
-                }}
-                plan={() => void plan()}
-                isSaved={savedPlaces.some((p) => p.id === end.id)}
-                toggleSaved={() =>
-                  setSavedPlaces((places) =>
-                    places.some((p) => p.id === end.id)
-                      ? places.filter((p) => p.id !== end.id)
-                      : [end, ...places],
-                  )
-                }
-              />
-            ))}
-          {view === "settings" && (
-            <Settings {...prefProps} repeatSetup={() => setOnboarding(true)}>
-              <ReportHistory />
-            </Settings>
-          )}
-          {view === "navigate" && route && (
-            <NavigationView
-              route={route}
-              step={step}
-              prefs={prefs}
-              playing={playing}
-              togglePlaying={() => {
-                setPlaying(!playing);
-                if (playing) window.speechSynthesis?.cancel();
-              }}
-              speak={speak}
-              next={() => {
-                setPlaying(false);
-                setStep((i) => Math.min(route.steps.length - 1, i + 1));
-              }}
-              end={endPreview}
-              where={() => void whereAmI()}
-              report={openReport}
-              notice={notice}
-              pausePreview={() => {
-                setPlaying(false);
-                window.speechSynthesis?.cancel();
-              }}
-              reroute={(coordinates) => {
-                const origin: Place = {
-                  id: "current",
-                  name: "Your location",
-                  subtitle: "Compass GPS location",
-                  coordinates,
-                };
-                setStart(origin);
-                setStartValid(true);
-                void plan(undefined, origin);
-              }}
-            />
-          )}
-          {view === "report" && (
-            <ReportView
-              key={reportLocation.id}
-              initialLocation={reportLocation}
-              back={() => setView(reportReturn)}
-              backLabel={
-                reportReturn === "navigate"
-                  ? "Back to route"
-                  : reportReturn === "map"
-                    ? "Back to map"
-                    : null
-              }
-              locate={getLocation}
-              dictate={dictate}
-              listening={listening}
-              speak={speak}
-            />
-          )}
-          {view === "map" && (
-            <>
-              <div className="map-toolbar">
-                <button
-                  className="outline-button"
-                  onClick={() => {
-                    setPickMode(null);
-                    setView(mapReturn);
-                  }}
-                >
-                  <ArrowLeft />
-                  Back
-                </button>
-                {pickMode && (
-                  <p role="status">
-                    Tap the map to choose your{" "}
-                    {pickMode === "start" ? "start" : "destination"}.
-                  </p>
-                )}
-              </div>
-              {selected && selectedPlace ? (
-                <div className="feature-card">
+              {error && (
+                <div className="error-card" role="alert">
+                  <p>{error}</p>
                   <button
-                    className="icon-button feature-close"
-                    aria-label="Close location details"
-                    onClick={() => setSelected(null)}
+                    className="icon-button"
+                    aria-label="Dismiss error"
+                    onClick={() => setError("")}
                   >
                     <X />
                   </button>
-                  <h1 tabIndex={-1}>{selected.properties.name}</h1>
-                  <p>{selected.properties.purpose}</p>
-                  <p className="helper">
-                    {selected.properties.location_precision}
-                  </p>
-                  <button
-                    className="dark-button"
-                    onClick={() => void plan(selectedPlace)}
-                  >
-                    Directions here
-                    <ArrowRight />
-                  </button>
-                  <button
-                    className="outline-button"
-                    onClick={() => {
-                      setReportLocation({
-                        ...selectedPlace,
-                        locationSource: "selected",
-                      });
-                      setReportReturn("map");
-                      setView("report");
-                    }}
-                  >
-                    <Flag />
-                    Report an issue here
-                  </button>
-                  <a
-                    href={selected.properties.source_url}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    View data source <ExternalLink size={18} />
-                  </a>
                 </div>
-              ) : !pickMode ? (
-                <details className="map-filters">
-                  <summary>
-                    <Layers />
-                    Map features
-                  </summary>
-                  <div>
-                    {kinds.map((k) => (
-                      <label key={k.id}>
-                        <input
-                          type="checkbox"
-                          checked={active.includes(k.id)}
-                          onChange={(e) =>
-                            setActive((a) =>
-                              e.target.checked
-                                ? [...a, k.id]
-                                : a.filter((x) => x !== k.id),
-                            )
-                          }
-                        />
-                        <k.icon size={24} />
-                        {k.name}
-                      </label>
-                    ))}
-                  </div>
-                </details>
-              ) : null}
-            </>
+              )}
+            </section>
           )}
-          {error && (
-            <div className="error-card" role="alert">
-              <p>{error}</p>
-              <button
-                className="icon-button"
-                aria-label="Dismiss error"
-                onClick={() => setError("")}
-              >
-                <X />
-              </button>
-            </div>
-          )}
-        </section>
-      </main>
-      <div className="sr-only" role="status" aria-live="polite">
-        {notice}
-      </div>
+        </main>
+        <div className="sr-only" role="status" aria-live="polite">
+          {notice}
+        </div>
       </div>
     </>
   );

@@ -27,6 +27,10 @@
 }
 body {
   margin: 0;
+  background: var(--soft);
+}
+#root {
+  min-height: 100dvh;
 }
 button,
 input,
@@ -900,13 +904,20 @@ h1:focus {
   margin: 12px 0;
 }
 .setup-shell {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
   min-height: 100dvh;
-  background: var(--soft);
-  display: grid;
-  place-items: center;
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow: auto;
   padding: 20px;
 }
 .onboarding {
+  flex-shrink: 0;
+  margin-block: auto;
   width: 440px;
   max-width: 100%;
   min-height: min(844px, calc(100dvh - 40px));
@@ -918,6 +929,11 @@ h1:focus {
   flex-direction: column;
   gap: 12px;
   color: var(--ink);
+}
+.settings-content {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 .setup-header {
   display: flex;
@@ -1862,7 +1878,9 @@ h1:focus {
     max-height: none;
     border: 0;
     border-radius: 0;
-    padding: 18px 16px 16px;
+    padding: calc(18px + env(safe-area-inset-top))
+      max(16px, env(safe-area-inset-right)) 16px
+      max(16px, env(safe-area-inset-left));
     box-shadow: none;
     gap: 12px;
   }
@@ -1872,12 +1890,17 @@ h1:focus {
   }
   .panel.navigation-panel {
     bottom: 0;
-    padding: 12px 16px max(16px, env(safe-area-inset-bottom));
+    padding: calc(12px + env(safe-area-inset-top))
+      max(16px, env(safe-area-inset-right))
+      max(16px, env(safe-area-inset-bottom))
+      max(16px, env(safe-area-inset-left));
   }
   .panel.map-panel {
     background: transparent;
     pointer-events: none;
-    padding: 16px;
+    padding: calc(16px + env(safe-area-inset-top))
+      max(16px, env(safe-area-inset-right)) 16px
+      max(16px, env(safe-area-inset-left));
   }
   .panel.map-panel > * {
     pointer-events: auto;
@@ -1903,13 +1926,17 @@ h1:focus {
   }
   .setup-shell {
     padding: 0;
+    background: var(--soft);
   }
   .onboarding {
     width: 100%;
     min-height: 100dvh;
     border: 0;
     border-radius: 0;
-    padding: 16px;
+    padding: calc(16px + env(safe-area-inset-top))
+      max(16px, env(safe-area-inset-right))
+      calc(16px + env(safe-area-inset-bottom))
+      max(16px, env(safe-area-inset-left));
   }
   .setup-header strong {
     font-size: 22px;

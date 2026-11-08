@@ -10,6 +10,7 @@ import {
 } from "../src/compass/orientationEngine";
 import type { Fix, OrientationResult } from "../src/compass/orientationEngine";
 import { magneticToTrue, readCompass } from "../src/compass/sensors";
+import { followHeading } from "../src/compass/useCompassDial";
 import type { Route } from "../src/model";
 
 const fix = (lon = -79.38, time = 10000, accuracy = 2): Fix => ({
@@ -265,4 +266,18 @@ test("Safari native headings can display while tilt or uncertain accuracy pauses
     ).magnetic,
   ).toBeNull();
   expect(readCompass(native, 1000, 90).reason).toContain("Rotate");
+});
+
+test("dial smoothing follows the short path through north and responds consistently at different frame rates", () => {
+  const wrapped = followHeading(359, 1, 16);
+  expect(Math.abs(angleDifference(wrapped, 359))).toBeLessThan(2);
+  expect(Math.abs(angleDifference(wrapped, 1))).toBeLessThan(2);
+  expect(followHeading(0, 90, 200)).toBeGreaterThan(85);
+  const result = (frames: number) => {
+    let value = 0;
+    for (let i = 0; i < frames; i++)
+      value = followHeading(value, 90, 1000 / frames);
+    return value;
+  };
+  expect(result(60)).toBeCloseTo(result(120), 8);
 });

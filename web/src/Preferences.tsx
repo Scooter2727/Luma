@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useScreenTransition } from "./useScreenTransition";
 import {
   ArrowLeft,
   ArrowRight,
@@ -128,17 +129,6 @@ export function CrossingChoices({
           />
         </label>
       ))}
-      <label className="select-label">
-        Walking speed
-        <select
-          value={prefs.walkingSpeed}
-          onChange={(e) => change({ walkingSpeed: Number(e.target.value) })}
-        >
-          <option value={0.8}>Slower · 0.8 m/s</option>
-          <option value={1.2}>Standard · 1.2 m/s</option>
-          <option value={1.5}>Brisk · 1.5 m/s</option>
-        </select>
-      </label>
       <p className="helper">
         With preferences off, Luma uses the fastest walk. Preferences use mapped
         information and may add time.
@@ -229,14 +219,21 @@ export function SpeedCard({ prefs, change, speak }: PreferenceProps) {
     </section>
   );
 }
-export function Onboarding(props: PreferenceProps & { done: () => void }) {
-  const { prefs, change, speak, done } = props;
+export function Onboarding(
+  props: PreferenceProps & { done: () => void; active?: boolean },
+) {
+  const { prefs, change, speak, done, active = true } = props;
   const [step, setStep] = useState(1);
+  const body = useRef<HTMLDivElement>(null);
+  useScreenTransition(body, step, active);
+  useEffect(() => {
+    if (active) body.current?.querySelector<HTMLElement>("h1")?.focus();
+  }, [step, active]);
   const titles = [
+    "Colour and display",
     "Voice guidance",
     "Directions style",
     "Crossing preferences",
-    "Display",
     "Ready to use Luma",
   ];
   return (
@@ -253,11 +250,12 @@ export function Onboarding(props: PreferenceProps & { done: () => void }) {
           <span key={n} className={n <= step ? "complete" : ""} />
         ))}
       </div>
-      <div className="setup-body">
+      <div className="setup-body" ref={body}>
         <h1 tabIndex={-1} key={step}>
           {titles[step - 1]}
         </h1>
-        {step === 1 && (
+        {step === 1 && <DisplayChoices {...props} />}
+        {step === 2 && (
           <>
             <p>Choose how to hear directions.</p>
             <fieldset className="choices">
@@ -300,9 +298,8 @@ export function Onboarding(props: PreferenceProps & { done: () => void }) {
             </fieldset>
           </>
         )}
-        {step === 2 && <DirectionsChoices {...props} />}{" "}
-        {step === 3 && <CrossingChoices {...props} />}{" "}
-        {step === 4 && <DisplayChoices {...props} />}{" "}
+        {step === 3 && <DirectionsChoices {...props} />}{" "}
+        {step === 4 && <CrossingChoices {...props} />}{" "}
         {step === 5 && (
           <div className="setup-summary">
             <Check size={64} />
@@ -316,12 +313,12 @@ export function Onboarding(props: PreferenceProps & { done: () => void }) {
             </p>
           </div>
         )}
-        {step < 3 && (
+        {(step === 2 || step === 3) && (
           <button
             className="outline-button test-setup"
             onClick={() =>
               speak(
-                step === 2
+                step === 3
                   ? "Turn slightly right, toward 2 o’clock."
                   : "Luma voice guidance. Your next crossing is ahead.",
               )
@@ -363,6 +360,8 @@ export function Settings(
   },
 ) {
   const [section, setSection] = useState("");
+  const content = useRef<HTMLDivElement>(null);
+  useScreenTransition(content, section);
   const groups = [
     { id: "voice", label: "Voice", icon: Volume2 },
     { id: "directions", label: "Directions", icon: Clock },
@@ -372,7 +371,7 @@ export function Settings(
     { id: "privacy", label: "Privacy", icon: Lock },
   ];
   return (
-    <>
+    <div className="settings-content" ref={content}>
       {section ? (
         <header className="page-header">
           <button
@@ -470,6 +469,6 @@ export function Settings(
           </details>
         </>
       )}
-    </>
+    </div>
   );
 }

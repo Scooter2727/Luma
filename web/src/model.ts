@@ -156,11 +156,11 @@ export async function request<T>(
   return r.status === 204 ? (undefined as T) : r.json();
 }
 
+export const WALKING_SPEED = 1.2;
 export type Preferences = {
   audible: boolean;
   fewer: boolean;
   tactile: boolean;
-  walkingSpeed: number;
   rate: number;
   screenReader: boolean;
   large: boolean;

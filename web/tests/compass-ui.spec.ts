@@ -887,3 +887,64 @@ test("blocked audio leaves the demo usable and allows an explicit sound retry", 
     page.getByRole("button", { name: "Start demo", exact: true }),
   ).toBeVisible();
 });
+
+test("compass dial animates fresh Safari readings between navigation ticks and wraps north without spinning", async ({
+  page,
+}) => {
+  await boot(page);
+  await page.evaluate(() =>
+    Object.defineProperty(DeviceOrientationEvent, "requestPermission", {
+      configurable: true,
+      value: () => Promise.resolve("granted"),
+    }),
+  );
+  await page
+    .getByRole("button", { name: "Open compass mode", exact: false })
+    .click();
+  await page.evaluate(() => {
+    (window as any).publishHeading = (heading: number) => {
+      const event = new Event("deviceorientation");
+      Object.assign(event, {
+        absolute: false,
+        beta: 0,
+        gamma: 0,
+        webkitCompassHeading: heading,
+        webkitCompassAccuracy: 10,
+      });
+      window.dispatchEvent(event);
+    };
+    (window as any).publishHeading(359);
+  });
+  await expect(page.locator(".compass-reading strong")).toHaveText("359°");
+  const angles = await page.evaluate(async () => {
+    const rotor = document.querySelector(".compass-rotor")!;
+    const samples: number[] = [];
+    const observer = new MutationObserver(() =>
+      samples.push(
+        -Number(rotor.getAttribute("transform")!.match(/rotate\(([^ ]+)/)![1]),
+      ),
+    );
+    observer.observe(rotor, {
+      attributes: true,
+      attributeFilter: ["transform"],
+    });
+    (window as any).publishHeading(1);
+    await new Promise((resolve) => setTimeout(resolve, 220));
+    observer.disconnect();
+    return samples;
+  });
+  expect(angles.length).toBeGreaterThan(4);
+  for (const angle of angles)
+    expect(Math.abs(((angle - 359 + 540) % 360) - 180)).toBeLessThanOrEqual(
+      2.1,
+    );
+  expect(Math.abs(((angles.at(-1)! - 1 + 540) % 360) - 180)).toBeLessThan(0.4);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.evaluate(() => (window as any).publishHeading(180));
+  await expect(page.locator(".compass-rotor")).toHaveAttribute(
+    "transform",
+    "rotate(-180 160 160)",
+  );
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  expect(await page.evaluate(() => (window as any).compassTest.clears)).toBe(1);
+});

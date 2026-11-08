@@ -290,7 +290,7 @@ export default function CompassPanel({
                 ["compassHeading", "Phone heading", 0, 359, 1],
                 ["expected", "Route bearing", 0, 359, 1],
                 ["accuracy", "GPS accuracy (metres)", 1, 100, 1],
-                ["speed", "Walking speed (metres per second)", 0, 3, 0.1],
+                ["speed", "Simulated movement speed (metres per second)", 0, 3, 0.1],
               ] as const
             ).map(([key, name, min, max, step]) => (
               <label className="compass-slider" key={key}>

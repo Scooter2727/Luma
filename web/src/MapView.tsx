@@ -6,6 +6,7 @@ import { mapIconImages, mapPalette, symbolInk } from "./mapTheme";
 import type { Coord, Feature, Route, Place, Step } from "./model";
 maplibregl.setWorkerUrl(mapWorkerUrl);
 type Props = {
+  decorative?: boolean;
   theme: string;
   data: Feature[];
   active: string[];
@@ -17,6 +18,7 @@ type Props = {
   visible: boolean;
 };
 export default function MapView({
+  decorative = false,
   theme,
   data,
   active,
@@ -321,7 +323,8 @@ export default function MapView({
       className={"map-shell" + (visible ? " mobile-map-visible" : "")}
       data-ready={mapReady}
       aria-label="Toronto accessibility map"
-      inert={!visible && window.innerWidth <= 760}
+      aria-hidden={decorative || undefined}
+      inert={decorative || (!visible && window.innerWidth <= 760)}
     >
       <div ref={container} className="map" />
       {mapError && (

@@ -1,4 +1,4 @@
-import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import type { Variants } from "framer-motion";
 import { Play, Mic } from "lucide-react";
 import { logoForTheme } from "./brand";
@@ -51,100 +51,105 @@ export default function Hero({ theme, onEnter }: Props) {
   const reduce = useReducedMotion();
 
   return (
-    <AnimatePresence>
-      <motion.div
-        className="hero-page"
-        role="dialog"
-        aria-label="Welcome to Luma"
-        initial={false}
-        exit={
-          reduce
-            ? { opacity: 0 }
-            : { opacity: 0, y: -32, transition: { duration: 0.45, ease: "easeIn" } }
-        }
+    <motion.div
+      className="hero-page"
+      role="dialog"
+      aria-label="Welcome to Luma"
+      aria-modal="true"
+      initial={false}
+      exit={
+        reduce
+          ? { opacity: 0, transition: { duration: 0 } }
+          : { opacity: 0, transition: { duration: 0.18, ease: "easeOut" } }
+      }
+    >
+      <div className="hero-bubbles" aria-hidden="true">
+        {bubbles.map((b, i) => (
+          <span
+            key={i}
+            className={"hero-bubble " + b.cls}
+            style={{
+              left: b.left,
+              width: b.size,
+              height: b.size,
+              animationDuration: b.duration + "s",
+              animationDelay: b.delay + "s",
+            }}
+          />
+        ))}
+      </div>
+
+      <motion.header
+        className="hero-top"
+        initial={reduce ? false : { opacity: 0, y: -16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
       >
-        <div className="hero-bubbles" aria-hidden="true">
-          {bubbles.map((b, i) => (
-            <span
-              key={i}
-              className={"hero-bubble " + b.cls}
-              style={{
-                left: b.left,
-                width: b.size,
-                height: b.size,
-                animationDuration: b.duration + "s",
-                animationDelay: b.delay + "s",
-              }}
-            />
-          ))}
+        <span className="hero-logo">
+          <img src={logoForTheme(theme)} alt="" width={40} height={40} />
+          <span>Luma</span>
+        </span>
+      </motion.header>
+
+      <motion.main
+        className="hero-content"
+        variants={reduce ? undefined : container}
+        initial={reduce ? false : "hidden"}
+        animate={reduce ? undefined : "visible"}
+      >
+        <div className="hero-copy">
+          <motion.h1 variants={reduce ? undefined : item}>
+            Directions you can hear.
+          </motion.h1>
+          <motion.p className="hero-lede" variants={reduce ? undefined : item}>
+            Clock-position guidance at the speed you choose — for blind and
+            low-vision pedestrians in downtown Toronto.
+          </motion.p>
+          <motion.div
+            className="hero-actions"
+            variants={reduce ? undefined : item}
+          >
+            <motion.button
+              className="hero-btn hero-btn-primary"
+              onClick={onEnter}
+              whileHover={reduce ? undefined : { scale: 1.03 }}
+              whileTap={reduce ? undefined : { scale: 0.97 }}
+            >
+              <Play size={26} fill="currentColor" />
+              Try Luma
+            </motion.button>
+            <motion.button
+              className="hero-btn hero-btn-secondary"
+              onClick={onEnter}
+              whileHover={reduce ? undefined : { scale: 1.03 }}
+              whileTap={reduce ? undefined : { scale: 0.97 }}
+            >
+              <Mic size={24} />
+              Ask Luma
+            </motion.button>
+          </motion.div>
         </div>
 
-        <motion.header
-          className="hero-top"
-          initial={reduce ? false : { opacity: 0, y: -16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
+        <motion.div
+          className="hero-caption"
+          variants={reduce ? undefined : caption}
         >
-          <span className="hero-logo">
-            <img src={logoForTheme(theme)} alt="" width={40} height={40} />
-            <span>Luma</span>
-          </span>
-        </motion.header>
-
-        <motion.main
-          className="hero-content"
-          variants={reduce ? undefined : container}
-          initial={reduce ? false : "hidden"}
-          animate={reduce ? undefined : "visible"}
-        >
-          <div className="hero-copy">
-            <motion.h1 variants={reduce ? undefined : item}>
-              Directions you can hear.
-            </motion.h1>
-            <motion.p className="hero-lede" variants={reduce ? undefined : item}>
-              Clock-position guidance at the speed you choose — for blind and
-              low-vision pedestrians in downtown Toronto.
-            </motion.p>
-            <motion.div className="hero-actions" variants={reduce ? undefined : item}>
-              <motion.button
-                className="hero-btn hero-btn-primary"
-                onClick={onEnter}
-                whileHover={reduce ? undefined : { scale: 1.03 }}
-                whileTap={reduce ? undefined : { scale: 0.97 }}
-              >
-                <Play size={26} fill="currentColor" />
-                Try Luma
-              </motion.button>
-              <motion.button
-                className="hero-btn hero-btn-secondary"
-                onClick={onEnter}
-                whileHover={reduce ? undefined : { scale: 1.03 }}
-                whileTap={reduce ? undefined : { scale: 0.97 }}
-              >
-                <Mic size={24} />
-                Ask Luma
-              </motion.button>
-            </motion.div>
+          <div className="hero-wave" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+            <span />
+            <span />
+            <span />
           </div>
-
-          <motion.div className="hero-caption" variants={reduce ? undefined : caption}>
-            <div className="hero-wave" aria-hidden="true">
-              <span />
-              <span />
-              <span />
-              <span />
-              <span />
-              <span />
-            </div>
-            <p className="hero-caption-line">
-              <span className="hero-type">“In 50 m, toward 3 o'clock.”</span>
-            </p>
-            <p className="hero-caption-sub">
-              onto Queen St W · north side, heading west
-            </p>
-          </motion.div>
-        </motion.main>
-      </motion.div>
-    </AnimatePresence>
+          <p className="hero-caption-line">
+            <span className="hero-type">“In 50 m, toward 3 o'clock.”</span>
+          </p>
+          <p className="hero-caption-sub">
+            onto Queen St W · north side, heading west
+          </p>
+        </motion.div>
+      </motion.main>
+    </motion.div>
   );
 }

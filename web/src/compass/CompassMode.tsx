@@ -5,6 +5,8 @@ import type { Route } from "../model";
 import { saved } from "../model";
 import { useTargetDemo } from "./useTargetDemo";
 import { targetLabels } from "./targetDemo";
+import { useCompassDial } from "./useCompassDial";
+import { useScreenTransition } from "../useScreenTransition";
 import {
   defaults,
   labels,
@@ -49,11 +51,12 @@ export default function CompassMode({
 }) {
   const backButton = useRef<HTMLButtonElement>(null);
   const modal = useRef<HTMLElement>(null);
+  const face = useRef<HTMLDivElement>(null);
+  useScreenTransition(modal, "compass", true, false);
   const [demoRunning, setDemoRunning] = useState(false);
   const {
     result,
-    compassHeading,
-    rawCompassHeading,
+    readHeading,
     compassReason,
     compassWarning,
     northReference,
@@ -69,11 +72,7 @@ export default function CompassMode({
     config: defaults,
     speak,
   });
-  const targetGame = useTargetDemo(
-    rawCompassHeading,
-    !compassReason && !compassWarning && rawCompassHeading !== null,
-    saved("compass-haptics", true),
-  );
+  const targetGame = useTargetDemo(readHeading, saved("compass-haptics", true));
   const demo = targetGame.demo;
   const demoState = demo?.state ?? "idle";
   const targetX = demo
@@ -101,9 +100,20 @@ export default function CompassMode({
     void requestCompass(entry.permission);
     backButton.current?.focus();
   }, [entry]);
-  const displayedHeading = demo ? rawCompassHeading : compassHeading;
-  const heading =
-    displayedHeading === null ? null : Math.round(displayedHeading) % 360;
+  useEffect(() => {
+    const chrome = document.querySelector<HTMLMetaElement>(
+      'meta[name="theme-color"]',
+    );
+    if (!chrome) return;
+    const previous = chrome.content;
+    chrome.content = getComputedStyle(document.documentElement)
+      .getPropertyValue("--surface")
+      .trim();
+    return () => {
+      chrome.content = previous;
+    };
+  }, []);
+  const heading = useCompassDial(face, readHeading);
   const direction =
     heading === null ? "" : directions[Math.round(heading / 45) % 8];
   const accessibleText =
@@ -172,6 +182,7 @@ export default function CompassMode({
       </button>
       <div className="compass-center">
         <div
+          ref={face}
           className="compass-face"
           data-demo-state={demoState}
           data-target={demo?.target}
@@ -193,7 +204,7 @@ export default function CompassMode({
                 transform="rotate(-90 160 160)"
               />
             )}
-            <g transform={`rotate(${-(displayedHeading ?? 0)} 160 160)`}>
+            <g className="compass-rotor">
               {Array.from({ length: 32 }, (_, i) => (
                 <line
                   key={i}
@@ -220,7 +231,6 @@ export default function CompassMode({
                   x={x}
                   y={y}
                   textAnchor="middle"
-                  transform={`rotate(${displayedHeading ?? 0} ${x} ${y})`}
                   className={
                     name === "N" ? "compass-cardinal north" : "compass-cardinal"
                   }

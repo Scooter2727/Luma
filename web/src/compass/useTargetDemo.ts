@@ -4,15 +4,14 @@ import { TargetDemo } from "./targetDemo";
 import type { TargetSnapshot } from "./targetDemo";
 
 export function useTargetDemo(
-  heading: number | null,
-  reliable: boolean,
+  source: () => { heading: number | null; reliable: boolean },
   haptics: boolean,
 ) {
   const [demo, setDemo] = useState<TargetSnapshot | null>(null);
   const [sound, setSound] = useState(false),
     [audioError, setAudioError] = useState(false);
-  const latest = useRef({ heading, reliable, haptics, sound });
-  latest.current = { heading, reliable, haptics, sound };
+  const latest = useRef({ source, haptics, sound });
+  latest.current = { source, haptics, sound };
   const game = useRef<TargetDemo | null>(null),
     generation = useRef(0);
   const feedback = useRef<DemoFeedback | null>(null);
@@ -34,13 +33,10 @@ export function useTargetDemo(
     const epoch = ++generation.current;
     window.speechSynthesis?.cancel();
     const audio = controller().unlock();
-    game.current = new TargetDemo(latest.current.heading);
+    const sample = latest.current.source();
+    game.current = new TargetDemo(sample.heading);
     setDemo(
-      game.current.update(
-        latest.current.heading,
-        performance.now(),
-        !latest.current.reliable,
-      ),
+      game.current.update(sample.heading, performance.now(), !sample.reliable),
     );
     void audio.then((ready) => {
       if (epoch === generation.current) {
@@ -73,10 +69,11 @@ export function useTargetDemo(
     const tick = () => {
       if (!game.current) return;
       const current = latest.current;
+      const sample = current.source();
       const next = game.current.update(
-        current.heading,
+        sample.heading,
         performance.now(),
-        document.hidden || !current.reliable,
+        document.hidden || !sample.reliable,
       );
       setDemo(next);
       controller().set(next.state, current.sound, current.haptics);

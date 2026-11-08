@@ -118,6 +118,13 @@ test("five-step onboarding saves direction, crossing and display choices", async
   await page.goto("/");
   await page.getByRole("button", { name: "Try Luma", exact: true }).click();
   await expect(
+    page.getByRole("heading", { name: "Colour and display", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "High contrast", exact: false })
+    .click();
+  await page.getByRole("button", { name: "Next", exact: true }).click();
+  await expect(
     page.getByRole("heading", { name: "Voice guidance", exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Next", exact: true }).click();
@@ -131,10 +138,6 @@ test("five-step onboarding saves direction, crossing and display choices", async
   await audit(page);
   await page.getByRole("button", { name: "Next", exact: true }).click();
   await page.getByLabel("Prefer audible crossings", { exact: false }).check();
-  await page.getByRole("button", { name: "Next", exact: true }).click();
-  await page
-    .getByRole("button", { name: "High contrast", exact: false })
-    .click();
   await page.getByRole("button", { name: "Next", exact: true }).click();
   await page.getByRole("button", { name: "Use Luma", exact: true }).click();
   await expect(
