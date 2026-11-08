@@ -1,4 +1,5 @@
 """Server-side speech configuration. Keys are read from the environment and never sent to the browser."""
+import hashlib
 import os
 from .runtime import ROOT, is_vercel
 
@@ -49,6 +50,11 @@ def elevenlabs_voice_id():
 
 def elevenlabs_model_id():
     return _get('ELEVENLABS_MODEL_ID', DEFAULT_ELEVENLABS_MODEL_ID)
+
+
+def voice_version():
+    """Changes with the voice or model, so browsers never replay audio cached for a previous voice."""
+    return hashlib.sha256(f'{elevenlabs_voice_id()}\0{elevenlabs_model_id()}'.encode()).hexdigest()[:12]
 
 
 def speech_configured():

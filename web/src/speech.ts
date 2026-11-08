@@ -8,6 +8,7 @@ const FAILURE_LIMIT = 2;
 const CACHE_LIMIT = 24;
 
 let status: boolean | null = null;
+let voice = "";
 let statusRequest: Promise<boolean> | null = null;
 let failures = 0;
 let generation = 0;
@@ -31,7 +32,10 @@ export function loadSpeechStatus(): Promise<boolean> {
   if (status !== null) return Promise.resolve(status);
   statusRequest ??= fetch("/api/speech/status")
     .then((r) => (r.ok ? r.json() : { available: false }))
-    .then((d: { available?: boolean }) => d.available === true)
+    .then((d: { available?: boolean; voice?: string }) => {
+      voice = d.voice ?? "";
+      return d.available === true;
+    })
     .catch(() => false)
     .then((available) => {
       status = available;
@@ -73,7 +77,9 @@ function remember(text: string, blob: Blob) {
   while (blobs.size > CACHE_LIMIT) blobs.delete(blobs.keys().next().value!);
 }
 const synthesisUrl = (text: string) =>
-  "/api/speech/synthesize?text=" + encodeURIComponent(text);
+  "/api/speech/synthesize?text=" +
+  encodeURIComponent(text) +
+  (voice ? "&voice=" + voice : "");
 async function download(text: string) {
   try {
     const r = await fetch(synthesisUrl(text), {

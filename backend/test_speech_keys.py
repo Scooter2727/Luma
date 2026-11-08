@@ -17,7 +17,7 @@ def test_keys_start_unsaved_and_are_never_echoed():
     assert saved['gemini'] == {'saved': True, 'hint': '…1234'}
     assert saved['elevenlabs'] == {'saved': True, 'hint': '…5678'}
     assert 'secret' not in json.dumps(saved)
-    assert client.get('/api/speech/status').json() == {'available': True}
+    assert client.get('/api/speech/status').json()['available'] is True
 
 
 def test_saving_keeps_other_env_lines_and_blank_fields(monkeypatch):

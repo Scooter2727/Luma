@@ -110,12 +110,12 @@ class SpeechRequest(BaseModel):
         if not value.strip():raise ValueError('Enter text to speak.')
         return value.strip()
 @app.get('/api/speech/status')
-def speech_status():return {'available':config.speech_configured()}
+def speech_status():return {'available':config.speech_configured(),'voice':config.voice_version()}
 async def stream_speech(text):
     if not config.speech_configured():raise HTTPException(503,SPEECH_UNAVAILABLE)
     stream=await speech_audio.synthesize_stream(text)
     if stream is None:raise HTTPException(503,'AI voice could not be generated. Luma uses the device voice instead.')
-    return StreamingResponse(stream,media_type='audio/mpeg',headers={'Cache-Control':'private, max-age=86400'})
+    return StreamingResponse(stream,media_type='audio/mpeg',headers={'Cache-Control':'no-store'})
 @app.post('/api/speech/synthesize')
 async def synthesize_speech(req:SpeechRequest):return await stream_speech(req.text)
 @app.get('/api/speech/synthesize')

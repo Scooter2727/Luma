@@ -18,11 +18,17 @@ def configure(monkeypatch):
 
 
 def test_status_reflects_configuration(monkeypatch):
-    assert client.get('/api/speech/status').json() == {'available': False}
+    assert client.get('/api/speech/status').json()['available'] is False
     monkeypatch.setenv('GEMINI_API_KEY', 'gemini-test')
-    assert client.get('/api/speech/status').json() == {'available': False}
+    assert client.get('/api/speech/status').json()['available'] is False
     monkeypatch.setenv('ELEVENLABS_API_KEY', 'eleven-test')
-    assert client.get('/api/speech/status').json() == {'available': True}
+    assert client.get('/api/speech/status').json()['available'] is True
+
+
+def test_status_voice_changes_with_the_voice(monkeypatch):
+    first = client.get('/api/speech/status').json()['voice']
+    monkeypatch.setenv('ELEVENLABS_VOICE_ID', 'another-voice')
+    assert client.get('/api/speech/status').json()['voice'] not in ('', first)
 
 
 def test_synthesize_is_unavailable_without_keys():

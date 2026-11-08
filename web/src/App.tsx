@@ -216,15 +216,22 @@ export default function App() {
   function testAiVoice(text: string) {
     setNotice(text);
     const turn = ++speechTurn.current;
-    resetAiSpeechSession();
     unlockAiAudio();
     window.speechSynthesis?.cancel();
-    void playAiSpeech(text, prefs.rate).then((outcome) => {
-      if (outcome !== "failed" || turn !== speechTurn.current) return;
-      const fallback = "AI voice is unavailable right now. " + text;
-      setNotice(fallback);
-      if (!prefs.screenReader) deviceSpeak(fallback);
-    });
+    // Re-read the server's settings so a newly saved key or voice is heard straight away.
+    void refreshSpeechStatus()
+      .then((available) => {
+        setSpeechAvailable(available);
+        return turn === speechTurn.current
+          ? playAiSpeech(text, prefs.rate)
+          : ("stopped" as const);
+      })
+      .then((outcome) => {
+        if (outcome !== "failed" || turn !== speechTurn.current) return;
+        const fallback = "AI voice is unavailable right now. " + text;
+        setNotice(fallback);
+        if (!prefs.screenReader) deviceSpeak(fallback);
+      });
   }
   useScreenTransition(
     panel,
