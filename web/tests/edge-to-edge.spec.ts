@@ -13,6 +13,10 @@ for (const top of [44, 59]) {
     expect((await page.locator(".setup-header").boundingBox())!.y).toBeGreaterThanOrEqual(top);
     for (let i = 0; i < 4; i++) await page.getByRole("button", { name: "Next", exact: true }).click();
     await page.getByRole("button", { name: "Use Luma", exact: true }).click();
+    const selected = page.locator('.main-nav button[aria-current="page"]');
+    const selectedBox = await selected.boundingBox();
+    expect(selectedBox!.y + selectedBox!.height).toBe(844);
+    expect(await page.locator("body").evaluate(el => getComputedStyle(el, "::before").content)).toBe("none");
     for (const tab of ["Home", "Routes", "Report", "Settings"]) {
       await page.getByRole("navigation", { name: "Main", exact: true }).getByRole("button", { name: tab, exact: true }).click();
       expect((await page.locator(".panel").boundingBox())!.y).toBe(0);
