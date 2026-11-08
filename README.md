@@ -22,6 +22,16 @@ Run these in two terminals from this folder:
 npm run dev
 ```
 
+AI voice is optional. To enable it locally, copy `.env.example` to `.env` and fill in the backend-only variables below. The backend reads `.env` on startup and never sends these values to the browser. Without both API keys, AI voice stays hidden and Luma uses the device voice.
+
+| Variable | Purpose | Default |
+| --- | --- | --- |
+| `GEMINI_API_KEY` | Google Gemini key for rewording route instructions | Required for AI voice |
+| `GEMINI_MODEL` | Gemini model | `gemini-3.8-flash` (`gemini-2.5-flash` is closed to new keys) |
+| `ELEVENLABS_API_KEY` | ElevenLabs API key, starting with `sk_` (not the key ID) | Required for AI voice |
+| `ELEVENLABS_VOICE_ID` | ElevenLabs voice | Premade "George" voice |
+| `ELEVENLABS_MODEL_ID` | ElevenLabs model | `eleven_turbo_v2_5` |
+
 Open http://localhost:5173 . To view on a phone on the same Wi-Fi, use the Network URL printed by Vite and allow local network access in the firewall. Ordinary HTTP over a LAN may not permit device geolocation; the preset start works without it. HTTPS is needed for geolocation on most non-localhost devices. The Vite proxy forwards API requests, so the phone only needs port 5173.
 
 ## Vercel deployment
@@ -42,6 +52,8 @@ Function settings include the five source files needed for routing and exclude l
 Walking and transit caches use the system temporary directory when Vercel injects `VERCEL=1`; local development still uses `data/out/`. `LUMA_CACHE_DIR` is an optional writable cache directory override, not a service binding. Caches are disposable and rebuild on cold instances, so initial routing/bus requests can be slower. The retained timetable's date range still applies.
 
 **Hosted report saving is intentionally disabled**, as requested. `GET /api/reports/status` advertises availability to the UI. Vercel report POST/read/delete endpoints return 503 before opening SQLite, and the interface disables Save report with an explanation. Local reports continue to persist in SQLite. Do not move report storage into `/tmp` and call it durable: [Vercel does not provide persistent local SQLite storage](https://vercel.com/kb/guide/is-sqlite-supported-in-vercel). A shared persistent database is required before hosted reporting can be enabled.
+
+**AI voice keys are Vercel Environment Variables for the `backend` service**, set in the Vercel project dashboard (or with `npx vercel env add`), not in `vercel.json` and never as `VITE_*` variables. `VITE_*` values are compiled into the public frontend bundle. `.env` is excluded from uploads, and the deployed backend does not read it. `GET /api/speech/status` advertises availability to the UI, as reports do. Without both keys, `POST /api/speech/synthesize` returns 503 and the AI voice option stays hidden. Synthesized audio is cached in the same disposable cache directory (`speech-cache/`) and is regenerated on cold instances. The synthesis and rephrase endpoints are unauthenticated proxies to paid APIs, capped at 1,000 characters per text and 80 steps per route; a public deployment needs rate limiting or authentication before keys are added.
 
 To test the integrated deployment:
 
@@ -65,7 +77,7 @@ The seven supplied HTML designs guide the rebuilt React interface: onboarding, H
 - The route chooser presents one real result at a time. Previous/Next switches routes; Read this route speaks the summary. The map button displays its geometry. Blue is walking, brown is bus travel, and dotted connectors are short unmapped approaches. Expand Step-by-step directions for the full itinerary. Edit journey returns to endpoints and preferences. Late responses cannot overwrite an edited journey.
 - Preview route opens the large navigation controls. Repeat speaks the current instruction; What’s next announces the next instruction without advancing; Next preview step explicitly advances the simulation. Pause/Play controls automatic preview progression. The preview pauses at crossings, showing the actual street name and listed/unknown feature information. End route returns focus to the preview button.
 - Clock instructions describe turns relative to the previous route segment, not the phone’s compass heading. Left/right remains the default. Both combines the instruction styles. Where am I during preview describes the simulated route position; on Home it requests GPS.
-- Settings groups Voice, Directions, Crossings, Display, Screen reader and Privacy. Four themes, speech speed and larger text are supported. Feature icon shapes and basemap styling retain their existing design. Attribution is available under Privacy → About & data.
+- Settings groups Voice, Directions, Crossings, Display, Screen reader and Privacy. Four themes, speech speed and larger text are supported. When the server has AI voice configured, Voice settings and setup offer **Try AI voice (experimental)**, off by default, with Test AI voice and a status line saying which voice is in use. Feature icon shapes and basemap styling retain their existing design. Attribution is available under Privacy → About & data.
 
 ## Reports
 
@@ -76,6 +88,14 @@ Select Signal silent, No locator tone, Button hard to find, Tactile paving probl
 `POST /api/reports` validates Toronto coordinates, issue types, source and text lengths. Reports persist in ignored `data/out/luma-reports.sqlite`, with a UUID, UTC timestamp and `unverified` status. `GET /api/reports/{id}` retrieves a record by its opaque identifier without exposing the deletion key. A random deletion key is returned only on creation and stored with this browser’s report history. `DELETE /api/reports/{id}` requires that key in `X-Report-Token`. Report history and deletion are available after saving and in Settings → Privacy.
 
 Reports are prototype records: they are not sent to the City, moderated, verified, or automatically used to alter routes. The backend database and browser history survive restarts/reloads. Clearing browser storage removes the local history and deletion keys, not the server records. There are no accounts, ownership recovery or report-list endpoint; public deployment needs an account/moderation and retention design. Avoid personal information in free-text notes. Microphone recognition may use the browser provider’s speech service; app code stores only the submitted text, not recordings.
+
+## AI voice
+
+AI-generated phrasing and third-party voice synthesis are best-effort. Luma falls back to the device's built-in voice automatically whenever AI voice is off, unconfigured, slow or failing. The deterministic instruction text and clock-position logic are unchanged and remain the source of truth for routing-relevant facts. The on-screen and screen-reader announcement always shows that text, set before any audio request. Screen-reader mode never plays AI audio.
+
+Every route step carries `ai_text`: the instruction in the chosen directions style, built on the server the same way as the browser's `instructionText()`. After routes load with AI voice on, the browser asks `POST /api/speech/rephrase` to reword each route in one Gemini request, in the background. A 20-step route takes about 6 seconds, so route planning never waits for it. Gemini runs at temperature 0.2 under instructions to add no facts. The server then keeps a rewrite only if it preserves the street name, every number, the left/right/clock wording and every caution such as "unknown" or "confirm", adds no signal, tactile or crossing claims, and stays within 1.5 times the original length. Anything else, including errors, timeouts and malformed replies, keeps the original wording.
+
+`POST /api/speech/synthesize` returns ElevenLabs MP3 audio, cached on disk by text, voice and model. The browser waits 2.5 seconds per instruction before speaking it with the device voice instead. Two failures in a row turn AI voice off for the rest of the session; the status line reports it, and Test AI voice tries again. During a preview, audio for the next step is fetched while the current one plays. When AI voice is on, instruction text, including street and destination names, is sent to Google and ElevenLabs. GPS coordinates are not sent.
 
 ## Routing and data scope
 
@@ -124,6 +144,8 @@ npm run test:e2e
 ```
 
 Frontend tests need Playwright Chromium (`npx playwright install chromium`) and both local servers running.
+
+`pytest backend` includes the AI voice tests (`test_speech_phrasing.py`, `test_speech_audio.py`, `test_speech_api.py` and the `ai_text` cases in `test_routing.py`). They mock Gemini and ElevenLabs, and `backend/conftest.py` clears the speech keys, so they never use a real key or the network, even with a filled-in `.env`. `web/tests/speech.spec.ts` and `web/tests/speech-ui.spec.ts` cover the browser fallback, circuit breaker, Settings toggle and navigation prefetch against mocked speech endpoints.
 
 ## Attribution
 
