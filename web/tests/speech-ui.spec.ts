@@ -19,6 +19,14 @@ function silentWav(seconds = 0.2, rate = 8000) {
   return b;
 }
 
+async function finishOnboarding(page: Page) {
+  const useLuma = page.getByRole("button", { name: "Use Luma", exact: true });
+  while (!(await useLuma.isVisible())) {
+    await page.getByRole("button", { name: "Next" }).click();
+  }
+  await useLuma.click();
+}
+
 async function boot(
   page: Page,
   available: boolean,
@@ -39,11 +47,10 @@ async function boot(
         });
   });
   await page.addInitScript((items) => {
-    localStorage.setItem("luma-onboarding-complete", "true");
     for (const [k, v] of Object.entries(items)) localStorage.setItem(k, v);
   }, storage);
   await page.goto("/");
-  await page.getByRole("button", { name: "Try Luma", exact: true }).click();
+  await finishOnboarding(page);
   return texts;
 }
 async function openVoiceSettings(page: Page) {
@@ -54,70 +61,58 @@ async function openVoiceSettings(page: Page) {
   await page.getByRole("button", { name: "Voice", exact: true }).click();
 }
 
-test("AI voice stays hidden and is explained when the server is not configured", async ({
+test("Luma voice is the voice, with the device voice only as a fallback", async ({
   page,
 }) => {
-  const texts = await boot(page, false);
+  await boot(page, false);
   await openVoiceSettings(page);
-  await expect(page.getByRole("button", { name: "Test voice" })).toBeVisible();
   await expect(page.getByText("Try AI voice (experimental)")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Test AI voice" })).toHaveCount(
-    0,
+  await expect(page.getByRole("button", { name: "Test voice", exact: true })).toHaveCount(0);
+  await expect(page.locator(".voice-engine")).toHaveText(
+    "Using device voice. Luma voice is unavailable right now.",
   );
-  await expect(page.locator(".voice-engine")).toHaveText("Using device voice");
-  await page.getByRole("button", { name: "Back to settings" }).click();
-  await page.getByRole("button", { name: "Privacy", exact: true }).click();
-  await expect(
-    page.getByText("AI voice is not available on this deployment"),
-  ).toBeVisible();
-  expect(texts).toEqual([]);
 });
 
-test("opting in to AI voice persists, reports the engine and plays a sample", async ({
+test("Luma voice is used by default and plays a sample through the server", async ({
   page,
 }) => {
-  const texts = await boot(page, true);
+  await recordDeviceSpeech(page);
+  const texts = await boot(page, true, "audio", { "luma-ai-voice": "false" });
   await openVoiceSettings(page);
-  const toggle = page.getByRole("checkbox", {
-    name: /Try AI voice \(experimental\)/,
-  });
-  await expect(toggle).not.toBeChecked();
-  await expect(page.locator(".voice-engine")).toHaveText("Using device voice");
-  await toggle.check();
-  await expect(page.locator(".voice-engine")).toHaveText("Using AI voice");
-  expect(await page.evaluate(() => localStorage.getItem("luma-ai-voice"))).toBe(
-    "true",
-  );
-  await page.getByRole("button", { name: "Test AI voice" }).click();
+  await expect(page.locator(".voice-engine")).toHaveText("Using Luma voice");
+  await page.getByRole("button", { name: "Test Luma voice" }).click();
   await expect.poll(() => texts.length).toBe(1);
   expect(texts[0]).toContain("Queen Street West");
-  await page.reload();
-  await page.getByRole("button", { name: "Try Luma", exact: true }).click();
-  await openVoiceSettings(page);
-  await expect(
-    page.getByRole("checkbox", { name: /Try AI voice \(experimental\)/ }),
-  ).toBeChecked();
+  expect(
+    await page.evaluate(
+      () => (window as unknown as { deviceSpoken: string[] }).deviceSpoken,
+    ),
+  ).toEqual([]);
 });
 
-test("repeated AI voice failures switch the status to the device voice", async ({
+test("repeated Luma voice failures switch the status to the device voice", async ({
   page,
 }) => {
-  await boot(page, true, "503", { "luma-ai-voice": "true" });
+  await boot(page, true, "503");
   await openVoiceSettings(page);
-  await expect(page.locator(".voice-engine")).toHaveText("Using AI voice");
-  await page.getByRole("button", { name: "Test voice", exact: true }).click();
-  await page.getByRole("button", { name: "Test voice", exact: true }).click();
+  await expect(page.locator(".voice-engine")).toHaveText("Using Luma voice");
+  await page.getByRole("button", { name: "Test Luma voice", exact: true }).click();
+  await page.getByRole("button", { name: "Test Luma voice", exact: true }).click();
   await expect(page.locator(".voice-engine")).toHaveText(
-    "Using device voice. AI voice is unavailable right now.",
+    "Using device voice. Luma voice is unavailable right now.",
   );
-  await page.getByRole("button", { name: "Test AI voice" }).click();
-  await expect(page.locator(".voice-engine")).toHaveText("Using AI voice");
+  await page.route("**/api/speech/synthesize?*", (r) =>
+    r.fulfill({ body: silentWav(), contentType: "audio/wav" }),
+  );
+  await page.getByRole("button", { name: "Test Luma voice" }).click();
+  await expect(page.locator(".voice-engine")).toHaveText("Using Luma voice");
 });
 
-test("screen reader mode hides the AI voice choice", async ({ page }) => {
+test("screen reader mode hides the Luma voice sample", async ({ page }) => {
   await boot(page, true, "audio", { "luma-screenReader": "true" });
   await openVoiceSettings(page);
   await expect(page.getByText("Try AI voice (experimental)")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Test Luma voice" })).toHaveCount(0);
   await expect(page.locator(".voice-engine")).toHaveText(
     "Using screen reader announcements",
   );
@@ -155,7 +150,7 @@ test("routes prefetch the rephrased first steps so the preview starts without wa
     });
   });
   await recordDeviceSpeech(page);
-  const texts = await boot(page, true, "audio", { "luma-ai-voice": "true" });
+  const texts = await boot(page, true, "audio");
   await page
     .getByRole("button", { name: "Example journey Try a walk" })
     .click();
@@ -191,7 +186,7 @@ test("routes prefetch the rephrased first steps so the preview starts without wa
   ).toEqual([]);
 });
 
-test("AI voice failure during preview falls back to the device voice wording", async ({
+test("Luma voice failure during preview falls back to the device voice wording", async ({
   page,
 }) => {
   await page.route("**/api/speech/rephrase", (r) => {
@@ -204,7 +199,7 @@ test("AI voice failure during preview falls back to the device voice wording", a
     });
   });
   await recordDeviceSpeech(page);
-  await boot(page, true, "503", { "luma-ai-voice": "true" });
+  await boot(page, true, "503");
   await previewWalk(page);
   await expect
     .poll(() =>
@@ -253,22 +248,17 @@ test("local key panel saves keys without reading them back and reports each serv
   await page.route("**/api/speech/status", (r) =>
     r.fulfill({ json: { available } }),
   );
-  await page.addInitScript(() =>
-    localStorage.setItem("luma-onboarding-complete", "true"),
-  );
+  await page.addInitScript(() => {});
   await page.goto("/");
-  await page.getByRole("button", { name: "Try Luma", exact: true }).click();
+  await finishOnboarding(page);
   await openVoiceSettings(page);
-  await expect(
-    page.getByRole("checkbox", { name: /Try AI voice/ }),
-  ).toHaveCount(0);
   const save = page.getByRole("button", { name: "Save keys" });
   await expect(save).toBeDisabled();
   await page.getByLabel("Google Gemini API key").fill("AQ.gemini-1234");
   await page.getByLabel(/ElevenLabs API key/).fill("sk_eleven-5678");
   available = true;
   await save.click();
-  await expect(page.getByText("Both keys work.")).toBeVisible();
+  await expect(page.getByText("Both keys work. Press Test Luma voice.")).toBeVisible();
   expect(saved).toEqual([
     {
       gemini_api_key: "AQ.gemini-1234",
@@ -281,9 +271,6 @@ test("local key panel saves keys without reading them back and reports each serv
     "placeholder",
     "Saved (…1234). Paste to replace.",
   );
-  await expect(
-    page.getByRole("checkbox", { name: /Try AI voice/ }),
-  ).toBeVisible();
 });
 
 test("the key panel is hidden when the server does not offer it", async ({

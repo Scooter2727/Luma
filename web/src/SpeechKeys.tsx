@@ -186,8 +186,7 @@ export function SpeechKeys({ onSaved }: { onSaved: () => void }) {
           ))}
         {check?.gemini.ok && check.elevenlabs.ok && (
           <p className="key-next">
-            Both keys work. Turn on Try AI voice above, then press Test AI
-            voice.
+            Both keys work. Press Test Luma voice.
           </p>
         )}
       </div>

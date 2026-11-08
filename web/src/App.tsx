@@ -44,7 +44,6 @@ import {
   playAiSpeech,
   prefetchAiSpeech,
   resetAiSpeechSession,
-  stopAiSpeech,
   unlockAiAudio,
 } from "./speech";
 import { LumaLoader } from "./LumaLoader";
@@ -108,7 +107,6 @@ export default function App() {
     directions: saved<string>("directions-style", "left-right") === "both"
       ? "cardinal"
       : saved("directions-style", "left-right"),
-    aiVoice: saved("ai-voice", false),
   }));
   const [onboarding, setOnboarding] = useState(true);
   const [showHero, setShowHero] = useState(false);
@@ -171,7 +169,6 @@ export default function App() {
   const route = routes[routeIndex],
     currentStep = route?.steps[step];
   const change = (values: Partial<Preferences>) => {
-    if (values.aiVoice) unlockAiAudio();
     setPrefs((p) => ({ ...p, ...values }));
   };
   const [speechAvailable, setSpeechAvailable] = useState(false),
@@ -202,37 +199,35 @@ export default function App() {
     setNotice(text);
     const turn = ++speechTurn.current;
     if (prefs.screenReader) return;
-    if (prefs.aiVoice && aiSpeechAvailable()) {
-      unlockAiAudio();
-      window.speechSynthesis?.cancel();
-      void playAiSpeech(aiText, prefs.rate).then((outcome) => {
-        if (outcome === "failed" && turn === speechTurn.current)
-          deviceSpeak(text);
-      });
-      return;
-    }
-    stopAiSpeech();
-    deviceSpeak(text);
+    unlockAiAudio();
+    window.speechSynthesis?.cancel();
+    void playAiSpeech(aiText, prefs.rate).then((outcome) => {
+      if (outcome === "failed" && turn === speechTurn.current)
+        deviceSpeak(text);
+    });
   }
   function testAiVoice(text: string) {
     setNotice(text);
     const turn = ++speechTurn.current;
     unlockAiAudio();
     window.speechSynthesis?.cancel();
-    // Re-read the server's settings so a newly saved key or voice is heard straight away.
-    void refreshSpeechStatus()
-      .then((available) => {
-        setSpeechAvailable(available);
-        return turn === speechTurn.current
-          ? playAiSpeech(text, prefs.rate)
-          : ("stopped" as const);
-      })
-      .then((outcome) => {
-        if (outcome !== "failed" || turn !== speechTurn.current) return;
-        const fallback = "AI voice is unavailable right now. " + text;
-        setNotice(fallback);
-        if (!prefs.screenReader) deviceSpeak(fallback);
-      });
+    const play =
+      turn === speechTurn.current
+        ? playAiSpeech(text, prefs.rate)
+        : Promise.resolve("stopped" as const);
+    void (aiSpeechAvailable()
+      ? play
+      : refreshSpeechStatus().then((available) => {
+          setSpeechAvailable(available);
+          setAiVoiceReady(aiSpeechAvailable());
+          return play;
+        })
+    ).then((outcome) => {
+      if (outcome !== "failed" || turn !== speechTurn.current) return;
+      const fallback = "AI voice is unavailable right now. " + text;
+      setNotice(fallback);
+      if (!prefs.screenReader) deviceSpeak(fallback);
+    });
   }
   useScreenTransition(
     panel,
@@ -259,7 +254,6 @@ export default function App() {
       screenReader: prefs.screenReader,
       large: prefs.large,
       "directions-style": prefs.directions,
-      "ai-voice": prefs.aiVoice,
     }))
       localStorage.setItem("luma-" + key, JSON.stringify(value));
     if (prefs.screenReader) cancelAllSpeech();
@@ -344,7 +338,7 @@ export default function App() {
     if (currentStep.crossing) setPlaying(false);
   }, [view, step]);
   useEffect(() => {
-    if (!prefs.aiVoice || prefs.screenReader || !aiVoiceReady || !route) return;
+    if (prefs.screenReader || !aiVoiceReady || !route) return;
     // While choosing, fetch the first two steps so the preview starts instantly; during the
     // preview, fetch only the next step. Re-runs when background rephrasing changes the wording.
     const upcoming =
@@ -361,7 +355,6 @@ export default function App() {
     step,
     view,
     showOptions,
-    prefs.aiVoice,
     prefs.screenReader,
     prefs.directions,
     aiVoiceReady,
@@ -534,7 +527,7 @@ export default function App() {
       setRouteIndex(0);
       setStep(0);
       setNotice(d.routes.length + " route options found.");
-      if (prefs.aiVoice && !prefs.screenReader && aiSpeechAvailable())
+      if (!prefs.screenReader && aiSpeechAvailable())
         for (const r of d.routes) void rephraseRoute(r, number);
     } catch (e) {
       if (number === requestNumber.current) setError((e as Error).message);
@@ -577,7 +570,7 @@ export default function App() {
     } catch {}
   }
   function startPreview() {
-    if (prefs.aiVoice) unlockAiAudio();
+    if (!prefs.screenReader) unlockAiAudio();
     setStep(0);
     setPlaying(true);
     setLastTrip(end);

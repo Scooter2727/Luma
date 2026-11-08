@@ -168,7 +168,6 @@ export type Preferences = {
   large: boolean;
   theme: string;
   directions: "clock" | "left-right" | "cardinal";
-  aiVoice: boolean;
 };
 export const timeLabel = (time: string) =>
   new Date(time).toLocaleTimeString("en-CA", {

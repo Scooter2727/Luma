@@ -40,38 +40,13 @@ export function VoiceEngineStatus({
 }: Pick<PreferenceProps, "prefs" | "speechAvailable" | "aiVoiceReady">) {
   const text = prefs.screenReader
     ? "Using screen reader announcements"
-    : prefs.aiVoice && speechAvailable && aiVoiceReady
-      ? "Using AI voice"
-      : prefs.aiVoice && speechAvailable
-        ? "Using device voice. AI voice is unavailable right now."
-        : "Using device voice";
+    : speechAvailable && aiVoiceReady
+      ? "Using Luma voice"
+      : "Using device voice. Luma voice is unavailable right now.";
   return (
     <p className="voice-engine" role="status">
       {text}
     </p>
-  );
-}
-export function AiVoiceChoice({
-  prefs,
-  change,
-  speechAvailable,
-}: Pick<PreferenceProps, "prefs" | "change" | "speechAvailable">) {
-  if (!speechAvailable || prefs.screenReader) return null;
-  return (
-    <label className="toggle-card">
-      <span>
-        <strong>Try AI voice (experimental)</strong>
-        <small>
-          A more natural voice. Directions keep the same facts, and Luma
-          switches to your device voice if AI voice is slow or unavailable.
-        </small>
-      </span>
-      <input
-        type="checkbox"
-        checked={prefs.aiVoice}
-        onChange={(e) => change({ aiVoice: e.target.checked })}
-      />
-    </label>
   );
 }
 export const themes = [
@@ -219,7 +194,7 @@ export function DisplayChoices({
   );
 }
 export function SpeedCard(props: PreferenceProps) {
-  const { prefs, change, speak, speechAvailable, testAiVoice } = props;
+  const { prefs, change, speechAvailable, testAiVoice } = props;
   return (
     <section className="speed-card" aria-labelledby="speed-heading">
       <h2 id="speed-heading">Speech speed</h2>
@@ -249,20 +224,13 @@ export function SpeedCard(props: PreferenceProps) {
         </button>
       </div>
       <div className="voice-tests">
-        <button
-          className="voice-test"
-          onClick={() => speak(SAMPLE_INSTRUCTION)}
-        >
-          <Volume2 size={30} />
-          Test voice
-        </button>
         {speechAvailable && !prefs.screenReader && testAiVoice && (
           <button
             className="voice-test"
             onClick={() => testAiVoice(SAMPLE_INSTRUCTION)}
           >
             <Sparkles size={30} />
-            Test AI voice
+            Test Luma voice
           </button>
         )}
       </div>
@@ -344,7 +312,6 @@ export function Onboarding(
                 </label>
               ))}
             </fieldset>
-            <AiVoiceChoice {...props} />
             <VoiceEngineStatus {...props} />
           </>
         )}
@@ -448,7 +415,6 @@ export function Settings(
       {section === "voice" && (
         <>
           <SpeedCard {...props} />
-          <AiVoiceChoice {...props} />
           {props.onSpeechKeysSaved && (
             <SpeechKeys onSaved={props.onSpeechKeysSaved} />
           )}
@@ -487,8 +453,8 @@ export function Settings(
           </p>
           <p>
             {props.speechAvailable
-              ? "AI voice is off unless you turn it on in Voice settings. When it is on, route instruction text, including street and destination names, is sent through this prototype’s server to Google Gemini for wording and to ElevenLabs for speech. GPS coordinates are not sent."
-              : "AI voice is not available on this deployment because it has not been configured. Luma uses your device voice."}
+              ? "Luma voice speaks route instructions. Instruction text, including street and destination names, is sent through this prototype’s server to Google Gemini for wording and to ElevenLabs for speech. GPS coordinates are not sent. If Luma voice cannot start, this device’s voice speaks instead."
+              : "Luma voice is not available on this deployment because it has not been configured. This device’s voice is used instead."}
           </p>
           <button className="outline-button" onClick={props.repeatSetup}>
             <SlidersHorizontal />
