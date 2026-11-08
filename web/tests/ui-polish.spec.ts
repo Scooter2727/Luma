@@ -79,7 +79,10 @@ test("desktop setup starts with colours over the map and keeps the map mounted a
     .click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "red-green");
   await page.screenshot({ path: "artifacts/luma-setup-map-desktop.png" });
-  await page.getByRole("button", { name: "Skip setup", exact: true }).click();
+  for (let step = 0; step < 4; step++) {
+    await page.getByRole("button", { name: "Next", exact: true }).click();
+  }
+  await page.getByRole("button", { name: "Use Luma", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Where to?", exact: true }),
   ).toBeVisible();
