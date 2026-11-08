@@ -19,7 +19,8 @@ Rules, all mandatory:
 - Keep each rewrite about as long as the original, never longer than one and a half times its length.
 - Return a JSON array of strings with exactly one rewrite per input step, in the same order."""
 
-DIRECTION_WORDS = {'left', 'right', 'straight', 'slight', 'slightly', 'sharp', 'sharply', 'ahead', 'back', 'around', "o'clock", 'north', 'south', 'east', 'west'}
+DIRECTION_WORDS = {'left', 'right', 'straight', 'slight', 'slightly', 'sharp', 'sharply', 'ahead', 'back', 'around', "o'clock", 'north', 'south', 'east', 'west',
+                   'northeast', 'northwest', 'southeast', 'southwest'}
 CLAIM_WORDS = {'audible', 'tactile', 'signal', 'signals', 'locator', 'button', 'beep', 'beeps', 'tone', 'paving', 'crosswalk', 'crossing', 'cross', 'bus', 'stop', 'board', 'transfer'}
 CAUTION_WORDS = {'unknown', 'not', 'unmapped', 'confirm', 'check', 'approximately', 'about', 'listed', 'scheduled', 'estimated', 'locate', 'may'}
 

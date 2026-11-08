@@ -80,7 +80,7 @@ class RouteRequest(BaseModel):
     walking_speed:float=Field(1.2,ge=.5,le=2)
     mode:Literal['walk','bus']='walk'
     departure_time:datetime|None=None
-    directions:Literal['clock','left-right','both']='left-right'
+    directions:Literal['clock','left-right','cardinal']='left-right'
     @field_validator('start','end')
     @classmethod
     def coordinate(cls,c):
@@ -125,14 +125,18 @@ async def synthesize_speech_url(text:str=Query(min_length=1,max_length=1000)):
     return await stream_speech(text.strip())
 @app.get('/api/transit/meta')
 def transit_meta():return {'service_start':feed_range()[0],'service_end':feed_range()[1],'timing':'scheduled','timezone':'America/Toronto','max_bus_transfers':1,'max_access_walk_metres':1000}
+COMPASS_POINTS=('north','northeast','east','southeast','south','southwest','west','northwest')
 def number_text(n):return str(int(n)) if float(n).is_integer() else str(n)
 def instruction_text(step,previous,style):
     """Mirror of web/src/model.ts instructionText(): the sentence the browser would speak."""
+    street=step.get('street') or 'the pedestrian path'
+    if style=='cardinal' and step.get('kind')=='walk' and step.get('bearing') is not None:
+        heading=COMPASS_POINTS[math.floor((step['bearing']%360)/45+.5)%8]
+        return f"Head {heading} along {street}. Continue {number_text(step['distance'])} metres."
     if style=='left-right' or step.get('kind')!='walk' or step.get('bearing') is None or previous is None or previous.get('bearing') is None:return step['text']
     delta=(step['bearing']-previous['bearing']+360)%360
     clock=math.floor(delta/30+.5)%12 or 12
-    phrase=f"Toward {clock} o'clock, along {step.get('street') or 'the pedestrian path'}. Continue {number_text(step['distance'])} metres."
-    return step['text']+' '+phrase if style=='both' else phrase
+    return f"Toward {clock} o'clock, along {street}. Continue {number_text(step['distance'])} metres."
 def add_spoken_text(routes,style):
     """Every step gets ai_text: the sentence to speak in the chosen directions style. The browser may later replace it via /api/speech/rephrase."""
     for r in routes:

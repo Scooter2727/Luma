@@ -108,3 +108,9 @@ def test_missing_key_makes_no_network_call(monkeypatch):
     monkeypatch.delenv('GEMINI_API_KEY', raising=False)
     monkeypatch.setattr(speech_phrasing, 'TRANSPORT', httpx.MockTransport(fail))
     assert run() == [s['text'] for s in STEPS]
+
+
+def test_rewrites_cannot_change_an_intercardinal_heading():
+    step = dict(text='Head northeast along King St. Continue 40 metres.', street='King St', distance=40)
+    assert not speech_phrasing.acceptable(step['text'], 'Go east along King St for 40 metres.', step)
+    assert speech_phrasing.acceptable(step['text'], 'Walk northeast on King St for 40 metres.', step)

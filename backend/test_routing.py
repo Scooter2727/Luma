@@ -156,7 +156,9 @@ def test_clock_ai_text_matches_the_browser_instruction():
     assert walks
     for step,previous in walks:
         assert step['ai_text']=="Toward {} o'clock, along {}. Continue {} metres.".format(math.floor((step['bearing']-previous['bearing']+360)%360/30+.5)%12 or 12,step['street'] or 'the pedestrian path',step['distance'])
-    assert instruction_text(dict(kind='walk',text='Walk.',bearing=90,distance=5,street=''),dict(bearing=0),'both')=="Walk. Toward 3 o'clock, along the pedestrian path. Continue 5 metres."
+    assert instruction_text(dict(kind='walk',text='Walk.',bearing=112.6,distance=5,street='King St'),None,'cardinal')=="Head southeast along King St. Continue 5 metres."
+    assert instruction_text(dict(kind='walk',text='Walk.',bearing=-22,distance=5.5,street=''),None,'cardinal')=="Head north along the pedestrian path. Continue 5.5 metres."
+    assert instruction_text(dict(kind='bus',text='Board the 504.',bearing=90,distance=5),None,'cardinal')=="Board the 504."
     assert route['steps'][-1]['ai_text']==route['steps'][-1]['text']
 
 def test_rephrase_returns_originals_without_keys():
