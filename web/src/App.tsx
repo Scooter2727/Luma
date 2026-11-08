@@ -41,6 +41,7 @@ import {
 import type { Coord, Feature, Place, Preferences, Route } from "./model";
 import {
   aiSpeechAvailable,
+  aiSpeechProblem,
   cancelAllSpeech,
   pauseAllSpeech,
   resumeAllSpeech,
@@ -200,11 +201,14 @@ export default function App() {
     setPrefs((p) => ({ ...p, ...values }));
   };
   const [speechAvailable, setSpeechAvailable] = useState(false),
-    [aiVoiceReady, setAiVoiceReady] = useState(aiSpeechAvailable);
+    [aiVoiceReady, setAiVoiceReady] = useState(aiSpeechAvailable),
+    [voiceProblem, setVoiceProblem] = useState(aiSpeechProblem);
   useEffect(() => {
-    const unsubscribe = onAiSpeechChange(() =>
-      setAiVoiceReady(aiSpeechAvailable()),
-    );
+    const unsubscribe = onAiSpeechChange(() => {
+      setAiVoiceReady(aiSpeechAvailable());
+      setVoiceProblem(aiSpeechProblem());
+      void loadSpeechStatus().then(setSpeechAvailable);
+    });
     void loadSpeechStatus().then(setSpeechAvailable);
     return unsubscribe;
   }, []);
@@ -661,6 +665,7 @@ export default function App() {
     speak,
     speechAvailable,
     aiVoiceReady,
+    voiceProblem,
     testAiVoice,
   };
   const selectedPlace = selected

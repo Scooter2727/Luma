@@ -25,6 +25,28 @@ def test_status_reflects_configuration(monkeypatch):
     assert client.get('/api/speech/status').json()['available'] is True
 
 
+def test_elevenlabs_works_without_a_gemini_key(monkeypatch, tmp_path):
+    monkeypatch.setenv('ELEVENLABS_API_KEY', 'eleven-test')
+    monkeypatch.setenv('LUMA_CACHE_DIR', str(tmp_path))
+    monkeypatch.setattr(speech_audio, 'TRANSPORT', httpx.MockTransport(
+        lambda request: httpx.Response(200, content=b'ID3audio', headers={'content-type':'audio/mpeg'})))
+    status=client.get('/api/speech/status')
+    assert status.json()['available'] is True
+    assert status.json()['rephrasing_available'] is False
+    assert status.headers['cache-control']=='no-store'
+    assert client.post('/api/speech/synthesize',json={'text':'Hello.'}).content==b'ID3audio'
+
+
+def test_provider_error_is_reported_without_secrets(monkeypatch,tmp_path):
+    configure(monkeypatch)
+    monkeypatch.setenv('LUMA_CACHE_DIR',str(tmp_path))
+    monkeypatch.setattr(speech_audio,'TRANSPORT',httpx.MockTransport(lambda r:httpx.Response(401,json={'detail':{'status':'invalid_api_key','message':'private provider response'}})))
+    assert client.post('/api/speech/synthesize',json={'text':'Test.'}).status_code==503
+    status=client.get('/api/speech/status').json()
+    assert status['error']['code']=='credentials'
+    assert 'eleven-test' not in str(status) and 'private provider response' not in str(status)
+
+
 def test_status_voice_changes_with_the_voice(monkeypatch):
     first = client.get('/api/speech/status').json()['voice']
     monkeypatch.setenv('ELEVENLABS_VOICE_ID', 'another-voice')

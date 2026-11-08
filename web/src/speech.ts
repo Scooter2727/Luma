@@ -1,16 +1,23 @@
+import { acquirePlaybackSession } from "./compass/audioSession";
 export type AiSpeechOutcome = "played" | "failed" | "stopped";
 
 // Fall back to the device voice if AI speech has not started by then.
-const START_TIMEOUT_MS = 1500;
+const START_TIMEOUT_MS = 10000;
 // Prefetches run in the background, so they can wait for slower syntheses.
-const PREFETCH_TIMEOUT_MS = 10000;
+const PREFETCH_TIMEOUT_MS = 15000;
 const FAILURE_LIMIT = 2;
+const RETRY_AFTER_MS = 30000;
+const STATUS_TTL_MS = 30000;
 const CACHE_LIMIT = 24;
 
 let status: boolean | null = null;
 let voice = "";
 let statusRequest: Promise<boolean> | null = null;
 let failures = 0;
+let checkedAt = 0;
+let retryTimer: ReturnType<typeof setTimeout> | undefined;
+let problem = "";
+let releasePlayback: (() => void) | null = null;
 let generation = 0;
 let element: HTMLAudioElement | null = null;
 let objectUrl = "";
@@ -42,23 +49,27 @@ export function onAiSpeechChange(listener: () => void) {
   listeners.add(listener);
   return () => void listeners.delete(listener);
 }
-export function loadSpeechStatus(): Promise<boolean> {
-  if (status !== null) return Promise.resolve(status);
-  statusRequest ??= fetch("/api/speech/status")
-    .then((r) => (r.ok ? r.json() : { available: false }))
-    .then((d: { available?: boolean; voice?: string }) => {
+export function aiSpeechProblem() { return problem; }
+export function loadSpeechStatus(force = false): Promise<boolean> {
+  if (!force && status !== null && Date.now() - checkedAt < STATUS_TTL_MS) return Promise.resolve(status);
+  statusRequest ??= fetch("/api/speech/status", { cache: "no-store", signal: AbortSignal.timeout(5000) })
+    .then((r) => { if (!r.ok) throw Error("Voice status unavailable"); return r.json(); })
+    .then((d: { available?: boolean; voice?: string; error?: { message?: string } }) => {
+      if (voice && voice !== d.voice) blobs.clear();
       voice = d.voice ?? "";
+      problem = d.error?.message ?? "";
       return d.available === true;
     })
-    .catch(() => false)
+    .catch(() => { problem = "The voice API could not be reached."; return false; })
     .then((available) => {
       status = available;
+      checkedAt = Date.now();
       notify();
       return available;
-    });
+    }).finally(() => { statusRequest = null; });
   return statusRequest;
 }
-/** False until the server confirms AI voice, and for the rest of the session after repeated failures. */
+/** Back off briefly after repeated errors, then automatically try ElevenLabs again. */
 export function aiSpeechAvailable() {
   return status === true && failures < FAILURE_LIMIT;
 }
@@ -66,22 +77,30 @@ export function aiSpeechAvailable() {
 export function refreshSpeechStatus(): Promise<boolean> {
   status = null;
   statusRequest = null;
-  failures = 0;
+  resetAiSpeechSession();
   blobs.clear();
   return loadSpeechStatus();
 }
 /** Clear the failure count, for example when the user explicitly tests AI voice again. */
 export function resetAiSpeechSession() {
+  clearTimeout(retryTimer);
   failures = 0;
   notify();
 }
 function recordFailure() {
   failures++;
-  if (failures === FAILURE_LIMIT) notify();
+  if (failures === FAILURE_LIMIT) {
+    notify();
+    clearTimeout(retryTimer);
+    retryTimer = setTimeout(resetAiSpeechSession, RETRY_AFTER_MS);
+  }
+  void loadSpeechStatus(true);
 }
 function recordSuccess() {
   if (failures) {
+    clearTimeout(retryTimer);
     failures = 0;
+    problem = "";
     notify();
   }
 }
@@ -95,6 +114,7 @@ const synthesisUrl = (text: string) =>
   encodeURIComponent(text) +
   (voice ? "&voice=" + voice : "");
 async function download(text: string) {
+  const requestedVoice = voice;
   try {
     const r = await fetch(synthesisUrl(text), {
       signal: AbortSignal.timeout(PREFETCH_TIMEOUT_MS),
@@ -102,7 +122,7 @@ async function download(text: string) {
     if (!r.ok || !r.headers.get("content-type")?.startsWith("audio/"))
       return null;
     const blob = await r.blob();
-    if (!blob.size) return null;
+    if (!blob.size || requestedVoice !== voice) return null;
     remember(text, blob);
     return blob;
   } catch {
@@ -169,6 +189,7 @@ export function stopAiSpeech() {
     element.removeAttribute("src");
   }
   release();
+  releasePlayback?.(); releasePlayback = null;
   done?.("stopped");
 }
 export function cancelAllSpeech() {
@@ -214,6 +235,7 @@ export async function playAiSpeech(
   if (blob) remember(text, blob);
   release();
   if (blob) objectUrl = URL.createObjectURL(blob);
+  releasePlayback ??= acquirePlaybackSession();
   return new Promise<AiSpeechOutcome>((resolve) => {
     let timer: ReturnType<typeof setTimeout> | undefined;
     finish = (outcome) => {
@@ -227,6 +249,7 @@ export async function playAiSpeech(
         audio.removeAttribute("src");
       }
       release();
+      releasePlayback?.(); releasePlayback = null;
       resolve(outcome);
     };
     audio.onplaying = () => {

@@ -111,11 +111,16 @@ class SpeechRequest(BaseModel):
         if not value.strip():raise ValueError('Enter text to speak.')
         return value.strip()
 @app.get('/api/speech/status')
-def speech_status():return {'available':config.speech_configured(),'voice':config.voice_version()}
+def speech_status():
+    available=config.speech_configured()
+    return JSONResponse(dict(available=available,voice=config.voice_version(),provider='elevenlabs',
+        rephrasing_available=bool(config.gemini_api_key()),
+        error=speech_audio.last_error() if available else dict(code='not_configured',message='ElevenLabs voice is not configured on this deployment.')),
+        headers={'Cache-Control':'no-store'})
 async def stream_speech(text):
     if not config.speech_configured():raise HTTPException(503,SPEECH_UNAVAILABLE)
     stream=await speech_audio.synthesize_stream(text)
-    if stream is None:raise HTTPException(503,'AI voice could not be generated. Luma uses the device voice instead.')
+    if stream is None:raise HTTPException(503,(speech_audio.last_error() or {}).get('message','ElevenLabs could not generate speech.'))
     return StreamingResponse(stream,media_type='audio/mpeg',headers={'Cache-Control':'no-store'})
 @app.post('/api/speech/synthesize')
 async def synthesize_speech(req:SpeechRequest):return await stream_speech(req.text)
@@ -173,7 +178,7 @@ class RephraseRequest(BaseModel):
 async def rephrase(req:RephraseRequest):
     """Natural spoken phrasing for one route. Unconfigured or failed rephrasing returns the original text."""
     steps=[s.model_dump() for s in req.steps]
-    texts=await speech_phrasing.rephrase_steps(steps) if config.speech_configured() else [s['text'] for s in steps]
+    texts=await speech_phrasing.rephrase_steps(steps) if config.gemini_api_key() else [s['text'] for s in steps]
     return {'texts':texts,'rephrased':[a!=s['text'] for a,s in zip(texts,steps)]}
 @app.post('/api/routes')
 def route(req:RouteRequest):

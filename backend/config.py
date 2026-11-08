@@ -58,7 +58,8 @@ def voice_version():
 
 
 def speech_configured():
-    return bool(gemini_api_key() and elevenlabs_api_key())
+    # Gemini only rephrases instructions. It must never gate ElevenLabs speech.
+    return bool(elevenlabs_api_key())
 
 
 def save_local_env(values):

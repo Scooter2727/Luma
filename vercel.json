@@ -12,15 +12,25 @@
       "framework": "fastapi",
       "entrypoint": "backend.app:app",
       "functions": {
-        "backend/app.py": {
+        "**/*.py": {
           "includeFiles": "data/{WAYFINDER_ALL_LOCATIONS.csv,ttc_stops.csv,sources/{pedestrian-network.geojson,centreline.geojson,ttc-gtfs.zip,ttc-surface-gtfs.zip}}",
-          "excludeFiles": "{node_modules/**,.venv/**,web/**,public/**,dist/**,artifacts/**,data/out/**,backend/test_*.py,backend/conftest.py,.pytest_cache/**,test-results/**,playwright-report/**}"
+          "excludeFiles": "{node_modules/**,.venv/**,web/**,public/**,dist/**,artifacts/**,data/**,backend/test_*.py,backend/conftest.py,.pytest_cache/**,test-results/**,playwright-report/**}"
         }
       }
     }
   },
   "rewrites": [
-    { "source": "/api/(.*)", "destination": { "service": "backend" } },
-    { "source": "/(.*)", "destination": { "service": "app" } }
+    {
+      "source": "/api/(.*)",
+      "destination": {
+        "service": "backend"
+      }
+    },
+    {
+      "source": "/(.*)",
+      "destination": {
+        "service": "app"
+      }
+    }
   ]
 }

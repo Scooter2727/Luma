@@ -65,15 +65,46 @@ test("a missing synthesis endpoint fails and trips the breaker after two attempt
   expect(calls.synthesize).toBe(2);
 });
 
-test("a slow synthesis response times out as failed", async ({ page }) => {
+test("a slow synthesis gets time to start instead of switching to device speech", async ({ page }) => {
   await load(page, true, "hang");
   const [outcome, elapsed] = await page.evaluate(async () => {
     const t = performance.now();
     return [await window.speech.playAiSpeech("Slow.", 1), performance.now() - t];
   });
-  expect(outcome).toBe("failed");
-  expect(elapsed).toBeGreaterThan(1300);
-  expect(elapsed).toBeLessThan(2500);
+  expect(outcome).toBe("played");
+  expect(elapsed).toBeGreaterThan(3500);
+  expect(elapsed).toBeLessThan(9000);
+});
+
+test("speech automatically recovers after the failure cooldown", async ({ page }) => {
+  await load(page, true, "404");
+  await page.clock.install();
+  await page.evaluate(async () => { await window.speech.playAiSpeech("One.",1); await window.speech.playAiSpeech("Two.",1); });
+  expect(await page.evaluate(() => window.speech.aiSpeechAvailable())).toBe(false);
+  await page.route("**/api/speech/synthesize?*", r => r.fulfill({body:silentWav(),contentType:"audio/wav"}));
+  await page.clock.fastForward(31000);
+  expect(await page.evaluate(() => window.speech.playAiSpeech("Recovered.",1))).toBe("played");
+});
+
+test("a stalled synthesis still has a bounded fallback", async ({ page }) => {
+  await load(page, true, "audio");
+  await page.clock.install();
+  const held: import("@playwright/test").Route[] = [];
+  await page.route("**/api/speech/synthesize?*", route => { held.push(route); });
+  await page.evaluate(() => { (window as any).outcome = window.speech.playAiSpeech("Stalled.",1); });
+  await expect.poll(() => held.length).toBe(1);
+  await page.clock.fastForward(11000);
+  expect(await page.evaluate(() => (window as any).outcome)).toBe("failed");
+  for (const route of held) await route.abort().catch(() => {});
+});
+
+test("an unavailable status is refreshed after the deployment becomes configured", async ({ page }) => {
+  await load(page, false, "audio");
+  await page.clock.install();
+  expect(await page.evaluate(() => window.speech.playAiSpeech("Before.",1))).toBe("failed");
+  await page.route("**/api/speech/status", route => route.fulfill({json:{available:true}}));
+  await page.clock.fastForward(31000);
+  expect(await page.evaluate(() => window.speech.playAiSpeech("After.",1))).toBe("played");
 });
 
 test("an unconfigured server is never asked to synthesize", async ({ page }) => {

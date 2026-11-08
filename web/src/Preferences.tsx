@@ -26,6 +26,7 @@ export type PreferenceProps = {
   speechAvailable?: boolean;
   /** AI voice is configured and has not failed repeatedly this session. */
   aiVoiceReady?: boolean;
+  voiceProblem?: string;
   testAiVoice?: (text: string) => void;
 };
 const SAMPLE_INSTRUCTION =
@@ -34,12 +35,13 @@ export function VoiceEngineStatus({
   prefs,
   speechAvailable,
   aiVoiceReady,
-}: Pick<PreferenceProps, "prefs" | "speechAvailable" | "aiVoiceReady">) {
+  voiceProblem,
+}: Pick<PreferenceProps, "prefs" | "speechAvailable" | "aiVoiceReady" | "voiceProblem">) {
   const text = prefs.screenReader
     ? "Using screen reader announcements"
     : speechAvailable && aiVoiceReady
       ? "Using Luma voice"
-      : "Using device voice. Luma voice is unavailable right now.";
+      : voiceProblem ? `${voiceProblem} Using device voice.` : "Using device voice. Luma voice is unavailable right now.";
   return (
     <p className="voice-engine" role="status">
       {text}

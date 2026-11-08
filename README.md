@@ -22,11 +22,11 @@ Run these in two terminals from this folder:
 npm run dev
 ```
 
-AI voice is optional. To enable it locally, copy `.env.example` to `.env` and fill in the backend-only variables below (the file is gitignored). The backend reads `.env` on startup and never sends these values to the browser. Without both API keys, AI voice stays hidden and Luma uses the device voice.
+AI voice is optional. To enable it locally, copy `.env.example` to `.env` and fill in the backend-only variables below (the file is gitignored). The backend reads `.env` on startup and never sends these values to the browser. ElevenLabs needs only `ELEVENLABS_API_KEY`; Gemini is optional and only rephrases instructions. Without an ElevenLabs key, Luma uses the device voice.
 
 | Variable | Purpose | Default |
 | --- | --- | --- |
-| `GEMINI_API_KEY` | Google Gemini key for rewording route instructions | Required for AI voice |
+| `GEMINI_API_KEY` | Google Gemini key for rewording route instructions | Optional |
 | `GEMINI_MODEL` | Gemini model | `gemini-3.8-flash` (`gemini-2.5-flash` is closed to new keys) |
 | `ELEVENLABS_API_KEY` | ElevenLabs API key, starting with `sk_` (not the key ID) | Required for AI voice |
 | `ELEVENLABS_VOICE_ID` | ElevenLabs voice | Premade "George" voice |
@@ -47,13 +47,13 @@ The backend intentionally uses `root: "."`, rather than `root: "backend"`: it im
 
 The more-specific `/api/(.*)` rewrite precedes the frontend catch-all. Vercel passes the original `/api/...` path through, matching the existing FastAPI routes. Browser calls already use relative `/api/...` URLs, so deployed requests share the page's origin and need no hardcoded hostname or frontend URL variable. There are no server-side service-to-service calls to bind: the Vite output is static. A runtime binding would become necessary if a server-side proxy were later added; do not expose a binding URL through `VITE_*` or invent one during a build. See [Services routing](https://vercel.com/docs/services/routing) and [Service bindings](https://vercel.com/docs/services/bindings).
 
-Function settings include the source files needed for routing, including the matching BusTime surface GTFS archive and exclude local environments, node modules, generated caches, frontend assets and tests from the Python bundle. `.vercelignore` also excludes local state and environment files from source uploads. The static GTFS archives are bundled; live City/TTC feeds are fetched and cached by the backend.
+Function settings explicitly include the six runtime data files needed for routing, including the matching BusTime surface GTFS archive. The remaining data collection exports (about 60 MB), local environments, node modules, generated caches, frontend assets and tests are excluded from the Python bundle. Explicit includes restore the required runtime files after the broad data exclusion. `.vercelignore` also excludes local state and environment files from source uploads. The static GTFS archives are bundled; live City/TTC feeds are fetched and cached by the backend.
 
 Walking and transit caches use the system temporary directory when Vercel injects `VERCEL=1`; local development still uses `data/out/`. `LUMA_CACHE_DIR` is an optional writable cache directory override, not a service binding. Caches are disposable and rebuild on cold instances, so initial routing/transit requests can be slower. The retained timetable's date range still applies.
 
 **Hosted report saving is intentionally disabled**, as requested. `GET /api/reports/status` advertises availability to the UI. Vercel report POST/read/delete endpoints return 503 before opening SQLite, and the interface disables Save report with an explanation. Local reports continue to persist in SQLite. Do not move report storage into `/tmp` and call it durable: [Vercel does not provide persistent local SQLite storage](https://vercel.com/kb/guide/is-sqlite-supported-in-vercel). A shared persistent database is required before hosted reporting can be enabled.
 
-**AI voice keys are Vercel Environment Variables for the `backend` service**, set in the Vercel project dashboard (or with `npx vercel env add`), not in `vercel.json` and never as `VITE_*` variables. `VITE_*` values are compiled into the public frontend bundle. `.env` is excluded from uploads, and the deployed backend does not read it. `GET /api/speech/status` advertises availability to the UI, as reports do. Without both keys, `/api/speech/synthesize` returns 503 and the AI voice option stays hidden. Synthesized audio is cached in the same disposable cache directory (`speech-cache/`) and is regenerated on cold instances. The synthesis and rephrase endpoints are unauthenticated proxies to paid APIs, capped at 1,000 characters per text and 80 steps per route; a public deployment needs rate limiting or authentication before keys are added.
+**AI voice keys are Vercel Environment Variables for the `backend` service**, set in the Vercel project dashboard (or with `npx vercel env add`), not in `vercel.json` and never as `VITE_*` variables. `VITE_*` values are compiled into the public frontend bundle. `.env` is excluded from uploads, and the deployed backend does not read it. `GET /api/speech/status` advertises availability to the UI, as reports do. Without `ELEVENLABS_API_KEY`, `/api/speech/synthesize` returns 503. Gemini availability does not gate ElevenLabs audio. Synthesized audio is cached in the same disposable cache directory (`speech-cache/`) and is regenerated on cold instances. The synthesis and rephrase endpoints are unauthenticated proxies to paid APIs, capped at 1,000 characters per text and 80 steps per route; a public deployment needs rate limiting or authentication before keys are added.
 
 To test the integrated deployment:
 
@@ -100,7 +100,7 @@ Every route step carries `ai_text`: the instruction in the chosen directions sty
 
 - While routes are compared, audio for each route's first two steps is downloaded, and downloaded again once background rephrasing changes their wording. During a preview, the next step is downloaded while the current one plays. Downloaded clips start instantly.
 - Anything not yet downloaded plays through the audio element as it streams, so speech starts with the first bytes rather than after the whole clip.
-- If speech has not started within 1.5 seconds, the instruction is spoken with the device voice instead. Background downloads may take up to 10 seconds.
+- If speech has not started within 10 seconds, the instruction is spoken with the device voice instead. Background downloads may take up to 15 seconds. Two failures pause ElevenLabs attempts for 30 seconds, then retry automatically. Voice status refreshes after 30 seconds; provider errors use safe messages without keys or raw upstream responses.
 - Taps that can lead to AI speech (turning it on, Test AI voice, starting a preview) play a silent clip, so iOS Safari later allows instructions that are not triggered by a tap.
 
 Two failures in a row turn AI voice off for the rest of the session; the status line reports it, and Test AI voice tries again. When AI voice is on, instruction text, including street and destination names, is sent to Google and ElevenLabs. GPS coordinates are not sent.
