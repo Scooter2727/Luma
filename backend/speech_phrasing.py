@@ -4,7 +4,8 @@ import re
 import httpx
 from . import config
 
-TIMEOUT_SECONDS = 4
+# Called in the background after routes load, never during a walk. A 20-step route takes about 6 s.
+TIMEOUT_SECONDS = 10
 ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent'
 # Tests replace this with an httpx.MockTransport.
 TRANSPORT = None

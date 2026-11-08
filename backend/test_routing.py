@@ -141,3 +141,41 @@ def test_gtfs_service_anchor_spans_daylight_saving_change():
     day=date(2026,11,1)
     assert service_epoch(day)==datetime(2026,11,1,12,tzinfo=TZ).timestamp()-43200
     assert datetime.fromisoformat(iso_at(day,3*3600)).timestamp()-datetime.fromisoformat(iso_at(day,3600)).timestamp()==7200
+
+def test_every_step_has_ai_text_equal_to_text_by_default(monkeypatch):
+    monkeypatch.delenv('GEMINI_API_KEY',raising=False)
+    for route in get_routes()+get_routes(prefer_audible=True):
+        assert route['ai_directions']=='left-right'
+        assert all(s['ai_text']==s['text'] for s in route['steps'])
+
+def test_clock_ai_text_matches_the_browser_instruction():
+    from backend.api import instruction_text
+    route=get_routes(directions='clock')[0]
+    assert route['ai_directions']=='clock'
+    walks=[(s,route['steps'][i-1]) for i,s in enumerate(route['steps']) if i and s['kind']=='walk' and route['steps'][i-1].get('bearing') is not None]
+    assert walks
+    for step,previous in walks:
+        assert step['ai_text']=="Toward {} o'clock, along {}. Continue {} metres.".format(math.floor((step['bearing']-previous['bearing']+360)%360/30+.5)%12 or 12,step['street'] or 'the pedestrian path',step['distance'])
+    assert instruction_text(dict(kind='walk',text='Walk.',bearing=90,distance=5,street=''),dict(bearing=0),'both')=="Walk. Toward 3 o'clock, along the pedestrian path. Continue 5 metres."
+    assert route['steps'][-1]['ai_text']==route['steps'][-1]['text']
+
+def test_rephrase_returns_originals_without_keys():
+    steps=[dict(text=s['ai_text'],street=s.get('street'),distance=s['distance'],crossing=s['crossing']) for s in get_routes()[0]['steps']]
+    body=client.post('/api/speech/rephrase',json={'steps':steps}).json()
+    assert body['texts']==[s['text'] for s in steps]
+    assert not any(body['rephrased'])
+
+def test_rephrase_uses_gemini_when_configured(monkeypatch):
+    from backend import api
+    calls=[]
+    async def fake(steps):
+        calls.append(steps);return ['Spoken '+s['text'] for s in steps]
+    monkeypatch.setenv('GEMINI_API_KEY','k');monkeypatch.setenv('ELEVENLABS_API_KEY','k')
+    monkeypatch.setattr(api.speech_phrasing,'rephrase_steps',fake)
+    get_routes()
+    assert not calls
+    body=client.post('/api/speech/rephrase',json={'steps':[{'text':'Cross Bay St.','street':'Bay St','crossing':True,'audible':None}]}).json()
+    assert body=={'texts':['Spoken Cross Bay St.'],'rephrased':[True]}
+    assert calls[0][0]['street']=='Bay St'
+    assert client.post('/api/speech/rephrase',json={'steps':[]}).status_code==422
+    assert client.post('/api/speech/rephrase',json={'steps':[{'text':'x'}]*81}).status_code==422

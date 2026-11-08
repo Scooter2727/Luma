@@ -39,7 +39,9 @@ export type Route = {
     control?: string;
     audible?: boolean | null;
     tactile?: boolean | null;
+    ai_text?: string;
   }[];
+  ai_directions?: Preferences["directions"];
   snap_distances: number[];
   mode: "walk" | "bus";
   departure_time: string;

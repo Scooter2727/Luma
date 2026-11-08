@@ -13,7 +13,7 @@ from pydantic import BaseModel,Field,field_validator
 from .walking import network,distance,walk_details,weight,ROOT
 from .transit import TZ,bus_journeys,feed_range
 from .reports import router as reports_router
-from . import config,speech_audio
+from . import config,speech_audio,speech_phrasing
 
 app=FastAPI(title='Luma',version='0.2.0')
 app.include_router(reports_router)
@@ -79,6 +79,7 @@ class RouteRequest(BaseModel):
     walking_speed:float=Field(1.2,ge=.5,le=2)
     mode:Literal['walk','bus']='walk'
     departure_time:datetime|None=None
+    directions:Literal['clock','left-right','both']='left-right'
     @field_validator('start','end')
     @classmethod
     def coordinate(cls,c):
@@ -117,8 +118,40 @@ async def synthesize_speech(req:SpeechRequest):
     return Response(audio,media_type='audio/mpeg',headers={'Cache-Control':'private, max-age=86400'})
 @app.get('/api/transit/meta')
 def transit_meta():return {'service_start':feed_range()[0],'service_end':feed_range()[1],'timing':'scheduled','timezone':'America/Toronto','max_bus_transfers':1,'max_access_walk_metres':1000}
+def number_text(n):return str(int(n)) if float(n).is_integer() else str(n)
+def instruction_text(step,previous,style):
+    """Mirror of web/src/model.ts instructionText(): the sentence the browser would speak."""
+    if style=='left-right' or step.get('kind')!='walk' or step.get('bearing') is None or previous is None or previous.get('bearing') is None:return step['text']
+    delta=(step['bearing']-previous['bearing']+360)%360
+    clock=math.floor(delta/30+.5)%12 or 12
+    phrase=f"Toward {clock} o'clock, along {step.get('street') or 'the pedestrian path'}. Continue {number_text(step['distance'])} metres."
+    return step['text']+' '+phrase if style=='both' else phrase
+def add_spoken_text(routes,style):
+    """Every step gets ai_text: the sentence to speak in the chosen directions style. The browser may later replace it via /api/speech/rephrase."""
+    for r in routes:
+        r['ai_directions']=style
+        for i,s in enumerate(r['steps']):s['ai_text']=instruction_text(s,r['steps'][i-1] if i else None,style)
+class RephraseStep(BaseModel):
+    text:str=Field(min_length=1,max_length=1000)
+    street:str|None=Field(None,max_length=200)
+    distance:float|None=None
+    crossing:bool=False
+    audible:bool|None=None
+    tactile:bool|None=None
+class RephraseRequest(BaseModel):
+    steps:list[RephraseStep]=Field(min_length=1,max_length=80)
+@app.post('/api/speech/rephrase')
+async def rephrase(req:RephraseRequest):
+    """Natural spoken phrasing for one route. Unconfigured or failed rephrasing returns the original text."""
+    steps=[s.model_dump() for s in req.steps]
+    texts=await speech_phrasing.rephrase_steps(steps) if config.speech_configured() else [s['text'] for s in steps]
+    return {'texts':texts,'rephrased':[a!=s['text'] for a,s in zip(texts,steps)]}
 @app.post('/api/routes')
 def route(req:RouteRequest):
+    response=plan_routes(req)
+    add_spoken_text(response['routes'],req.directions)
+    return response
+def plan_routes(req:RouteRequest):
     if distance(req.start,req.end)<5:raise HTTPException(422,'Start and destination are the same. Choose two different locations.')
     depart=departure(req);net=network()
     try:g,(a,b),offsets=net.query_graph(req.start,req.end)
