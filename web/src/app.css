@@ -1,8 +1,13 @@
 @import url("https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap");
 :root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  color-scheme: light;
   font-family: "Atkinson Hyperlegible", system-ui, sans-serif;
   color: #14161c;
-  background: #f7f8fc;
+  background: var(--viewport-background, #f7f8fc);
   font-synthesis: none;
   --primary: #5865f2;
   --primary-text: #fff;
@@ -35,13 +40,26 @@ html,
 body {
   height: 100%;
   overflow: hidden;
+  background: var(--viewport-background, var(--soft));
 }
 body {
   margin: 0;
-  background: var(--soft);
 }
 #root {
+  height: 100dvh;
   min-height: 100dvh;
+}
+/* Home Screen mode uses translucent system chrome with light status icons. */
+@media (display-mode: standalone) {
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0 0 auto;
+    height: var(--safe-top);
+    background: linear-gradient(to bottom, rgb(0 0 0 / 75%) 0%, rgb(0 0 0 / 75%) 60%, transparent);
+    pointer-events: none;
+    z-index: 1100;
+  }
 }
 button,
 input,
@@ -1271,8 +1289,8 @@ h1:focus {
 .compass-demo-start.outline-button {
   position: absolute;
   z-index: 1;
-  top: max(20px, env(safe-area-inset-top));
-  right: max(20px, env(safe-area-inset-right));
+  top: max(20px, var(--safe-top));
+  right: max(20px, var(--safe-right));
   width: auto;
   min-width: 140px;
   min-height: 60px;
@@ -1352,7 +1370,7 @@ h1:focus {
 }
 .compass-demo-audio {
   position: absolute;
-  bottom: max(12px, env(safe-area-inset-bottom));
+  bottom: max(12px, var(--safe-bottom));
   left: 50%;
   transform: translateX(-50%);
   text-align: center;
@@ -1415,8 +1433,8 @@ h1:focus {
 .compass-back.outline-button {
   position: absolute;
   z-index: 1;
-  top: max(20px, env(safe-area-inset-top));
-  left: max(20px, env(safe-area-inset-left));
+  top: max(20px, var(--safe-top));
+  left: max(20px, var(--safe-left));
   min-height: 60px;
   min-width: 120px;
   width: auto;
@@ -1843,6 +1861,7 @@ h1:focus {
   --readable-accent: #9b3658;
 }
 [data-theme="contrast"] {
+  color-scheme: dark;
   --primary: #ffd600;
   --primary-text: #000;
   --ink: #fff;
@@ -1911,8 +1930,8 @@ h1:focus {
     position: fixed;
     inset: auto 0 0;
     width: 100%;
-    height: calc(92px + env(safe-area-inset-bottom));
-    padding: 0 0 env(safe-area-inset-bottom);
+    height: calc(92px + var(--safe-bottom));
+    padding: 0 var(--safe-right) var(--safe-bottom) var(--safe-left);
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 0;
@@ -1933,34 +1952,34 @@ h1:focus {
     box-shadow: inset 0 5px var(--primary);
   }
   .panel {
-    inset: 0 0 calc(92px + env(safe-area-inset-bottom));
+    inset: 0 0 calc(92px + var(--safe-bottom));
     width: 100%;
     max-height: none;
     border: 0;
     border-radius: 0;
-    padding: calc(18px + env(safe-area-inset-top))
-      max(16px, env(safe-area-inset-right)) 16px
-      max(16px, env(safe-area-inset-left));
+    padding: calc(18px + var(--safe-top))
+      max(16px, var(--safe-right)) 16px
+      max(16px, var(--safe-left));
     box-shadow: none;
     gap: 12px;
   }
   .panel.focused-panel {
     bottom: 0;
-    padding-bottom: max(16px, env(safe-area-inset-bottom));
+    padding-bottom: max(16px, var(--safe-bottom));
   }
   .panel.navigation-panel {
     bottom: 0;
-    padding: calc(12px + env(safe-area-inset-top))
-      max(16px, env(safe-area-inset-right))
-      max(16px, env(safe-area-inset-bottom))
-      max(16px, env(safe-area-inset-left));
+    padding: calc(12px + var(--safe-top))
+      max(16px, var(--safe-right))
+      max(16px, var(--safe-bottom))
+      max(16px, var(--safe-left));
   }
   .panel.map-panel {
     background: transparent;
     pointer-events: none;
-    padding: calc(16px + env(safe-area-inset-top))
-      max(16px, env(safe-area-inset-right)) 16px
-      max(16px, env(safe-area-inset-left));
+    padding: calc(16px + var(--safe-top))
+      max(16px, var(--safe-right)) 16px
+      max(16px, var(--safe-left));
   }
   .panel.map-panel > * {
     pointer-events: auto;
@@ -1970,7 +1989,7 @@ h1:focus {
     pointer-events: none;
   }
   .map-shell {
-    bottom: 92px;
+    bottom: calc(92px + var(--safe-bottom));
   }
   .navigating .map-shell {
     bottom: 0;
@@ -1993,16 +2012,16 @@ h1:focus {
     min-height: 100dvh;
     border: 0;
     border-radius: 0;
-    padding: calc(16px + env(safe-area-inset-top))
-      max(16px, env(safe-area-inset-right))
-      calc(16px + env(safe-area-inset-bottom))
-      max(16px, env(safe-area-inset-left));
+    padding: calc(16px + var(--safe-top))
+      max(16px, var(--safe-right))
+      calc(16px + var(--safe-bottom))
+      max(16px, var(--safe-left));
   }
   .setup-header strong {
     font-size: 22px;
   }
   .navigation-screen {
-    min-height: calc(100dvh - 12px - env(safe-area-inset-top) - max(16px, env(safe-area-inset-bottom)));
+    min-height: calc(100dvh - 12px - var(--safe-top) - max(16px, var(--safe-bottom)));
   }
   .navigation-controls {
     min-height: 340px;

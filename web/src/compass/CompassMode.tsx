@@ -34,7 +34,7 @@ function sensorMessage(reason: string) {
     return "Move phone gently to start compass";
   if (reason.includes("accuracy is unavailable"))
     return "Compass accuracy unavailable";
-  if (reason.includes("accuracy")) return "Compass accuracy is low";
+  if (reason.includes("accuracy")) return "";
   return "Compass unavailable";
 }
 export default function CompassMode({
@@ -113,7 +113,7 @@ export default function CompassMode({
   const demoStatus = demo
     ? demo.state === "waiting"
       ? compassReason || compassWarning
-        ? sensorMessage(compassReason || compassWarning)
+        ? sensorMessage(compassReason || compassWarning) || "Waiting for compass"
         : "Waiting for compass"
       : demo.state === "on"
         ? `On track · Hold ${Math.ceil((3000 - demo.heldMs) / 1000)} s`
@@ -129,11 +129,14 @@ export default function CompassMode({
     );
     if (!chrome) return;
     const previous = chrome.content;
+    const previousBackground = document.documentElement.style.getPropertyValue("--viewport-background");
     chrome.content = getComputedStyle(document.documentElement)
       .getPropertyValue("--surface")
       .trim();
+    document.documentElement.style.setProperty("--viewport-background", chrome.content);
     return () => {
       chrome.content = previous;
+      document.documentElement.style.setProperty("--viewport-background", previousBackground);
     };
   }, []);
   const heading = useCompassDial(face, readHeading);
@@ -142,7 +145,7 @@ export default function CompassMode({
   const accessibleText =
     heading === null
       ? "Compass heading unavailable. " + (compassReason || result.reason)
-      : `Compass. ${heading} degrees ${direction}. ${northReference === "true" ? "True north" : "Magnetic north"}.${compassWarning ? " Approximate reading. " + compassWarning : ""}`;
+      : `Compass. ${heading} degrees ${direction}. ${northReference === "true" ? "True north" : "Magnetic north"}.${compassWarning ? " Approximate reading. " + sensorMessage(compassWarning) : ""}`;
   const targetDescription = demo
     ? ` Demo target ${Math.round(demo.target)} degrees. ${demoStatus}.`
     : "";
@@ -293,7 +296,7 @@ export default function CompassMode({
             ) : (
               "Waiting for compass"
             )
-          ) : compassWarning ? (
+          ) : compassWarning && sensorMessage(compassWarning) ? (
             sensorMessage(compassWarning)
           ) : result.state === "UNCERTAIN" ? (
             northReference === "true" ? (

@@ -170,6 +170,7 @@ export default function App() {
     panel,
     `${view}:${showOptions}`,
     !onboarding && !showHero,
+    false,
   );
   useEffect(() => {
     document.documentElement.dataset.theme = prefs.theme;
@@ -197,20 +198,21 @@ export default function App() {
     const chrome = document.querySelector<HTMLMetaElement>(
       'meta[name="theme-color"]',
     );
-    if (chrome)
-      chrome.content =
+    const background =
         prefs.theme === "contrast"
           ? "#000000"
           : showHero
             ? prefs.theme === "blue-yellow"
               ? "#f0f0eb"
               : "#ffffff"
-            : view === "map"
+            : view === "map" && !onboarding
               ? "#e8ede9"
               : prefs.theme === "blue-yellow"
                 ? "#e7e8e2"
                 : "#f7f8fc";
-  }, [prefs.theme, view, showHero]);
+    if (chrome) chrome.content = background;
+    document.documentElement.style.setProperty("--viewport-background", background);
+  }, [prefs.theme, view, showHero, onboarding]);
   useEffect(() => {
     const c = new AbortController();
     request<{ features: Feature[] }>("/api/locations", { signal: c.signal })

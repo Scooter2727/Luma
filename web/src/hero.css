@@ -203,14 +203,14 @@
 
 @media (max-width: 760px) {
   .hero-top {
-    padding: calc(20px + env(safe-area-inset-top))
-      max(16px, env(safe-area-inset-right)) 20px
-      max(16px, env(safe-area-inset-left));
+    padding: calc(20px + var(--safe-top))
+      max(16px, var(--safe-right)) 20px
+      max(16px, var(--safe-left));
   }
   .hero-content {
-    padding: 0 max(16px, env(safe-area-inset-right))
-      calc(24px + env(safe-area-inset-bottom))
-      max(16px, env(safe-area-inset-left));
+    padding: 0 max(16px, var(--safe-right))
+      calc(24px + var(--safe-bottom))
+      max(16px, var(--safe-left));
     display: flex;
     flex-direction: column;
     gap: 18px;

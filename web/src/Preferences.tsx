@@ -389,15 +389,7 @@ export function Settings(
         </>
       )}
       {section === "voice" && <SpeedCard {...props} />}{" "}
-      {section === "directions" && (
-        <>
-          <DirectionsChoices {...props} />
-          <p className="helper">
-            Clock directions describe turns relative to the previous route
-            segment. They do not measure which way your phone is facing.
-          </p>
-        </>
-      )}
+      {section === "directions" && <DirectionsChoices {...props} />}
       {section === "crossings" && <CrossingChoices {...props} />}{" "}
       {section === "display" && <DisplayChoices {...props} />}{" "}
       {section === "reader" && (
