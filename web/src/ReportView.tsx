@@ -14,6 +14,7 @@ import {
   TrafficCone,
 } from "lucide-react";
 import PlacePicker from "./PlacePicker";
+import { logoForTheme } from "./brand";
 import type { Place } from "./model";
 import { request, saved } from "./model";
 export type LocatedPlace = Place & {
@@ -40,6 +41,7 @@ export const issueTypes = [
   { id: "other", label: "Other issue", icon: Mic },
 ];
 type Props = {
+  theme: string;
   initialLocation: LocatedPlace;
   back: () => void;
   backLabel: string | null;
@@ -100,6 +102,7 @@ export function ReportHistory() {
   );
 }
 export default function ReportView({
+  theme,
   initialLocation,
   back,
   backLabel,
@@ -202,7 +205,7 @@ export default function ReportView({
           >
             <ArrowLeft />
           </button>
-        ) : null}
+        ) : <img src={logoForTheme(theme)} alt="" />}
         <h1>
           {confirmation ? "Report saved" : issue ? "Confirm report" : "Report"}
         </h1>
@@ -213,11 +216,6 @@ export default function ReportView({
           </span>
         )}
       </header>
-      {!availability.enabled && (
-        <p className="helper" role="status">
-          {availability.reason}
-        </p>
-      )}
       {confirmation ? (
         <>
           <div className="report-confirmation">
@@ -342,11 +340,11 @@ export default function ReportView({
             onChange={(e) => setNotes(e.target.value)}
             rows={4}
           />
-          <p className="helper">
-            {availability.enabled
-              ? "Reports are saved in Luma for review. They are not automatically sent to the City or used to change routes."
-              : availability.reason}
-          </p>
+          {availability.enabled && (
+            <p className="helper">
+              Reports are saved in Luma for review. They are not automatically sent to the City or used to change routes.
+            </p>
+          )}
           <button
             className="dark-button"
             disabled={busy || !valid || !availability.enabled}

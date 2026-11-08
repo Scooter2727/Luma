@@ -50,7 +50,7 @@ export function useOrientationTracking({
   config,
   speak,
 }: {
-  route: Route;
+  route?: Route;
   enabled: boolean;
   pointing: boolean;
   simulation: Simulation;
@@ -276,6 +276,7 @@ export function useOrientationTracking({
         reason = gps
           ? "GPS accuracy is too low or the reading is old. Corrections are paused."
           : "Waiting for a precise location reading.";
+      else if (!route) reason = "No route selected.";
       else if (gps) {
         const match = matchRoute(route, gps);
         target = match.bearing;

@@ -20,6 +20,7 @@ import { CrossingChoices } from "./Preferences";
 import type { PreferenceProps } from "./Preferences";
 import type { Place, Route } from "./model";
 import { timeLabel } from "./model";
+import { logoForTheme } from "./brand";
 type PlannerProps = PreferenceProps & {
   start: Place;
   end: Place;
@@ -46,13 +47,14 @@ export function JourneyPlanner(p: PlannerProps) {
   return (
     <>
       <header className="page-header">
+        <img src={logoForTheme(p.prefs.theme)} alt="" />
         <h1 tabIndex={-1}>Plan a journey</h1>
         <button
           className="icon-button"
           aria-label="Show map"
           onClick={() => p.map()}
         >
-          <MapIcon />
+          <MapIcon size={27} />
         </button>
       </header>
       <div className="journey-fields">
@@ -85,16 +87,6 @@ export function JourneyPlanner(p: PlannerProps) {
           onValidityChange={p.setEndValid}
         />
         <div className="endpoint-tools">
-          <button
-            onClick={() => {
-              p.setStart(p.end);
-              p.setEnd(p.start);
-              p.setStartValid(true);
-              p.setEndValid(true);
-            }}
-          >
-            Swap start and destination
-          </button>
           <button onClick={() => p.map("end")}>
             <MapPin size={20} />
             Choose end on map
@@ -149,11 +141,6 @@ export function JourneyPlanner(p: PlannerProps) {
         </summary>
         <CrossingChoices {...p} />
       </details>
-      <p className="helper">
-        {p.prefs.audible || p.prefs.fewer || p.prefs.tactile
-          ? "Accessibility preferences are on. Routes may take longer."
-          : "Fastest route by default."}
-      </p>
       <button
         className="dark-button"
         disabled={!p.startValid || !p.endValid}
@@ -214,7 +201,7 @@ export function RouteChoices(p: ChoiceProps) {
           aria-label="Show route on map"
           onClick={p.map}
         >
-          <MapIcon />
+          <MapIcon size={27} />
         </button>
       </header>
       {p.busy && (
@@ -245,16 +232,14 @@ export function RouteChoices(p: ChoiceProps) {
             </li>
             <li>
               <Volume2 size={38} />
-              <span>Audible signal listed at {r.audible}</span>
+              <span>{r.audible} audible crossing{r.audible === 1 ? "" : "s"}</span>
             </li>
-            <li className={r.tactile < r.crossings ? "unknown" : ""}>
-              <Grid2X2 size={38} />
-              <span>
-                {r.tactile < r.crossings
-                  ? "Tactile unknown at " + (r.crossings - r.tactile)
-                  : "Tactile mapped at " + r.tactile}
-              </span>
-            </li>
+            {r.tactile >= r.crossings && (
+              <li>
+                <Grid2X2 size={38} />
+                <span>Tactile mapped at {r.tactile}</span>
+              </li>
+            )}
           </ul>
           {r.mode === "bus" && (
             <div className="bus-details">
@@ -288,9 +273,9 @@ export function RouteChoices(p: ChoiceProps) {
                     r.minutes +
                     " minutes. " +
                     r.crossings +
-                    " crossings. Audible signals listed at " +
+                    " crossings. " +
                     r.audible +
-                    ". " +
+                    (r.audible === 1 ? " audible crossing. " : " audible crossings. ") +
                     r.explanation,
                 )
               }
@@ -314,30 +299,6 @@ export function RouteChoices(p: ChoiceProps) {
             <Play size={34} />
             Preview route {p.index + 1}
           </button>
-          <details className="itinerary">
-            <summary>Step-by-step directions · {r.steps.length} steps</summary>
-            <p className="route-explanation">{r.explanation}</p>
-            <ol>
-              {r.steps.map((s, i) => (
-                <li key={i}>
-                  <strong>{s.title}</strong>
-                  <p>
-                    {s.text.startsWith(s.title + ". ")
-                      ? s.text.slice(s.title.length + 2)
-                      : s.text}
-                  </p>
-                  {s.scheduled_time && (
-                    <time>{timeLabel(s.scheduled_time)} · scheduled</time>
-                  )}
-                </li>
-              ))}
-            </ol>
-          </details>
-          <p className="helper">
-            Listed audible signals are assumed to cover all directions in this
-            prototype. Crossing conditions and signal phases are not monitored
-            live.
-          </p>
         </>
       )}
     </>

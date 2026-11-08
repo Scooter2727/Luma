@@ -1,5 +1,4 @@
 import { useRef, useState } from "react";
-import CompassPanel from "./compass/CompassPanel";
 import CompassMode from "./compass/CompassMode";
 import { requestCompassAccess } from "./compass/sensors";
 import {
@@ -9,7 +8,7 @@ import {
   RotateCcw,
   Pause,
   Play,
-  LocateFixed,
+  Compass,
   ChevronsRight,
   X,
   Flag,
@@ -40,19 +39,14 @@ export default function NavigationView({
   playing,
   togglePlaying,
   speak,
-  next,
   end,
-  where,
   report,
-  notice,
   pausePreview,
-  reroute,
 }: Props) {
-  const [compassActive, setCompassActive] = useState(false);
   const [compassEntry, setCompassEntry] = useState<{
     permission: Promise<string | null>;
   } | null>(null);
-  const directionCard = useRef<HTMLButtonElement>(null);
+  const compassButton = useRef<HTMLButtonElement>(null);
   const s = route.steps[step],
     upcoming = route.steps[step + 1];
   const text = instructionText(s, route.steps[step - 1], prefs.directions);
@@ -78,9 +72,8 @@ export default function NavigationView({
   }
   function closeCompass() {
     setCompassEntry(null);
-    setCompassActive(false);
     window.speechSynthesis?.cancel();
-    window.requestAnimationFrame(() => directionCard.current?.focus());
+    window.requestAnimationFrame(() => compassButton.current?.focus());
   }
   if (compassEntry)
     return (
@@ -97,18 +90,6 @@ export default function NavigationView({
       className={"navigation-screen " + (s.crossing ? "crossing-screen" : "")}
       aria-label={s.crossing ? "At the crossing" : "Route preview"}
     >
-      <header className="navigation-header">
-        <span className="preview-badge">
-          Preview · {step + 1}/{route.steps.length}
-        </span>
-        <button
-          className="icon-button"
-          aria-label="Report a problem"
-          onClick={report}
-        >
-          <Flag size={25} />
-        </button>
-      </header>
       <h1 className="sr-only" tabIndex={-1}>
         {s.crossing ? "At the crossing" : "Active navigation preview"}
       </h1>
@@ -156,11 +137,7 @@ export default function NavigationView({
         </>
       ) : (
         <>
-          <button
-            className="navigation-instruction"
-            ref={directionCard}
-            onClick={openCompass}
-          >
+          <div className="navigation-instruction">
             {isBus ? (
               <Bus size={56} />
             ) : s.title.toLowerCase().includes("right") ? (
@@ -171,9 +148,8 @@ export default function NavigationView({
             <span>
               <strong>{distanceLabel}</strong>
               <span className="instruction-summary">{summary}</span>
-              <span className="instruction-action">Open compass mode</span>
             </span>
-          </button>
+          </div>
           <div
             className="navigation-controls"
             role="group"
@@ -183,17 +159,13 @@ export default function NavigationView({
               <RotateCcw size={60} />
               Repeat
             </button>
-            <button onClick={togglePlaying} disabled={compassActive}>
+            <button onClick={togglePlaying}>
               {playing ? <Pause size={60} /> : <Play size={60} />}{" "}
               {playing ? "Pause" : "Play preview"}
             </button>
-            <button className="where-control" onClick={where}>
-              <LocateFixed size={60} />
-              <span>
-                Where
-                <br />
-                am I
-              </span>
+            <button ref={compassButton} className="where-control" onClick={openCompass}>
+              <Compass size={60} />
+              <span>Compass</span>
             </button>
             <button
               onClick={() =>
@@ -214,30 +186,19 @@ export default function NavigationView({
           </div>
         </>
       )}
-      <CompassPanel
-        route={route}
-        screenReader={prefs.screenReader}
-        speak={speak}
-        reroute={reroute}
-        onActivityChange={(active) => {
-          setCompassActive(active);
-          if (active) pausePreview();
-        }}
-      />
-      <div className="preview-step-actions">
-        <button className="text-action" disabled={!upcoming} onClick={next}>
-          Next preview step <ArrowRight size={21} />
+      <footer className="navigation-footer">
+        <button className="outline-button end-route" onClick={end}>
+          <X size={28} />
+          End route
         </button>
-        <span>{route.minutes} min journey</span>
-      </div>
-      <button className="outline-button end-route" onClick={end}>
-        <X size={28} />
-        End route
-      </button>
-      <details className="spoken-details">
-        <summary>Instruction text</summary>
-        <p>{notice || text}</p>
-      </details>
+        <button
+          className="icon-button"
+          aria-label="Report a problem"
+          onClick={report}
+        >
+          <Flag size={25} />
+        </button>
+      </footer>
     </section>
   );
 }

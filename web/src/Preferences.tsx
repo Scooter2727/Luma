@@ -5,6 +5,7 @@ import {
   ArrowRight,
   Check,
   Clock,
+  Compass,
   ChevronsLeftRight,
   Volume2,
   Minus,
@@ -62,10 +63,10 @@ export function DirectionsChoices({
             icon: ChevronsLeftRight,
           },
           {
-            id: "both",
-            label: "Both",
-            description: "Clock and left / right",
-            icon: Clock,
+            id: "cardinal",
+            label: "Cardinal directions",
+            description: "“Head northeast”",
+            icon: Compass,
           },
         ] as const
       ).map((c) => (
@@ -129,10 +130,6 @@ export function CrossingChoices({
           />
         </label>
       ))}
-      <p className="helper">
-        With preferences off, Luma uses the fastest walk. Preferences use mapped
-        information and may add time.
-      </p>
     </div>
   );
 }
@@ -240,7 +237,6 @@ export function Onboarding(
     <section className="onboarding" aria-label="Set up Luma">
       <header className="setup-header">
         <img src={logoForTheme(prefs.theme)} alt="" />
-        <strong>Step {step} of 5</strong>
         <button className="text-action" onClick={done}>
           Skip setup
         </button>
@@ -303,14 +299,6 @@ export function Onboarding(
         {step === 5 && (
           <div className="setup-summary">
             <Check size={64} />
-            <p>
-              Your settings are saved on this device. You can change them at any
-              time.
-            </p>
-            <p>
-              Routes use mapped accessibility features. The route preview is a
-              simulation, and crossing signals are not monitored live.
-            </p>
           </div>
         )}
         {(step === 2 || step === 3) && (
@@ -319,7 +307,11 @@ export function Onboarding(
             onClick={() =>
               speak(
                 step === 3
-                  ? "Turn slightly right, toward 2 o’clock."
+                  ? prefs.directions === "cardinal"
+                    ? "Head northeast along Queen Street. Continue 50 metres."
+                    : prefs.directions === "clock"
+                      ? "Toward 2 o’clock. Continue 50 metres."
+                      : "Turn slightly right. Continue 50 metres."
                   : "Luma voice guidance. Your next crossing is ahead.",
               )
             }
@@ -345,10 +337,6 @@ export function Onboarding(
             <ArrowRight />
           </button>
         </div>
-      </div>
-      <div className="setup-spoken" aria-live="polite">
-        <Volume2 size={24} />
-        Step {step} of 5. {titles[step - 1]}.
       </div>
     </section>
   );

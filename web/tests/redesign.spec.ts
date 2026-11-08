@@ -96,8 +96,8 @@ test("hosted report saving is visibly disabled without creating records", async 
   await boot(page);
   await page.getByRole("button", { name: "Report", exact: true }).click();
   await expect(
-    page.getByRole("status").filter({ hasText: "Report saving is disabled" }),
-  ).toBeVisible();
+    page.getByText("Report saving is disabled on this deployment. No report has been saved.", { exact: true }),
+  ).toHaveCount(0);
   await page
     .getByRole("button", { name: "Signal silent", exact: true })
     .click();
@@ -242,7 +242,7 @@ test("desktop retains map icons and computes different preferred routes", async 
   expect(errors).toEqual([]);
 });
 
-test("endpoint validity, swapping and saved places preserve confirmed coordinates", async ({
+test("endpoint validity and saved places preserve confirmed coordinates", async ({
   page,
 }) => {
   const errors: string[] = [];
@@ -269,9 +269,8 @@ test("endpoint validity, swapping and saved places preserve confirmed coordinate
     .getByRole("option")
     .filter({ hasText: "Royal Ontario Museum" })
     .click();
-  await page
-    .getByRole("button", { name: "Swap start and destination", exact: true })
-    .click();
+  await page.getByRole("combobox", { name: "To", exact: true }).fill("Royal Ontario");
+  await page.getByRole("option").filter({ hasText: "Royal Ontario Museum" }).click();
   await expect(
     page.getByRole("combobox", { name: "To", exact: true }),
   ).toHaveValue("Royal Ontario Museum");

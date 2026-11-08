@@ -38,6 +38,15 @@ def locations():
     return [dict(r,kind=category(r)) for r in rows if r['latitude'] and r['longitude'] and r['source_status']!='planned' and 'relocated' not in r['source_status']]
 @app.get('/api/health')
 def health():return {'status':'ok','locations':len(locations())}
+@app.get('/api/current-road')
+def current_road(longitude:float=Query(...,ge=-180,le=180),latitude:float=Query(...,ge=-90,le=90)):
+    # Never label a distant Toronto street as the user's current road.
+    if not (-79.65 <= longitude <= -79.10 and 43.55 <= latitude <= 43.90):
+        return {'street':None}
+    net=network()
+    edge,_,offset=net.project((longitude,latitude))
+    street=net.edge_attrs[edge].get('street') if offset<=30 else None
+    return {'street':street or None}
 @app.get('/api/locations')
 def geojson():
     keys=['id','name','kind','feature','purpose','source_url','source_status','location_precision','address_or_position','transit_routes','demo_assumption']

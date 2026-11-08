@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import MapView from "./MapView";
 import Hero from "./Hero";
+import CompassMode from "./compass/CompassMode";
+import { requestCompassAccess } from "./compass/sensors";
 import HomeView from "./HomeView";
 import { JourneyPlanner, RouteChoices } from "./JourneyPlanner";
 import { Onboarding, Settings } from "./Preferences";
@@ -89,13 +91,17 @@ export default function App() {
     screenReader: saved("screenReader", false),
     large: saved("large", false),
     theme: localStorage.getItem("luma-theme") || "default",
-    directions: saved("directions-style", "left-right"),
+    directions: saved<string>("directions-style", "left-right") === "both"
+      ? "cardinal"
+      : saved("directions-style", "left-right"),
   }));
-  const [onboarding, setOnboarding] = useState(
-    () => !saved("onboarding-complete", false),
-  );
-  const [showHero, setShowHero] = useState(true);
+  const [onboarding, setOnboarding] = useState(true);
+  const [showHero, setShowHero] = useState(false);
   const panel = useRef<HTMLElement>(null);
+  const [homeCompass, setHomeCompass] = useState<{
+    permission: Promise<string | null>;
+    trigger: HTMLElement | null;
+  } | null>(null);
   const [view, setView] = useState<View>("home"),
     [data, setData] = useState<Feature[]>([]),
     [loaded, setLoaded] = useState(false),
@@ -472,7 +478,7 @@ export default function App() {
         )}
       </AnimatePresence>
       <div
-        inert={showHero}
+        inert={showHero || !!homeCompass}
         className={
           "app " +
           (onboarding ? "setting-up " : "") +
@@ -586,7 +592,10 @@ export default function App() {
                   plan={(p) => void plan(p)}
                   map={() => showMap("home")}
                   saved={() => go("saved")}
-                  where={() => void whereAmI()}
+                  where={() => setHomeCompass({
+                    permission: requestCompassAccess(),
+                    trigger: document.activeElement as HTMLElement | null,
+                  })}
                   dictate={dictate}
                   listening={listening}
                   speak={speak}
@@ -726,6 +735,7 @@ export default function App() {
               )}
               {view === "report" && (
                 <ReportView
+                  theme={prefs.theme}
                   key={reportLocation.id}
                   initialLocation={reportLocation}
                   back={() => setView(reportReturn)}
@@ -853,6 +863,20 @@ export default function App() {
           {notice}
         </div>
       </div>
+      {homeCompass && (
+        <CompassMode
+          route={route}
+          entry={homeCompass}
+          screenReader={prefs.screenReader}
+          speak={speak}
+          back={() => {
+            const trigger = homeCompass.trigger;
+            setHomeCompass(null);
+            window.speechSynthesis?.cancel();
+            requestAnimationFrame(() => trigger?.focus());
+          }}
+        />
+      )}
     </>
   );
 }

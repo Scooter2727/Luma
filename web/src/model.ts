@@ -79,7 +79,7 @@ export const kinds = [
     id: "tactile",
     name: "Tactile paving",
     short: "Tactile paving",
-    color: "#16856e",
+    color: "#147d67",
     icon: Grid2X2,
   },
   {
@@ -165,7 +165,7 @@ export type Preferences = {
   screenReader: boolean;
   large: boolean;
   theme: string;
-  directions: "clock" | "left-right" | "both";
+  directions: "clock" | "left-right" | "cardinal";
 };
 export const timeLabel = (time: string) =>
   new Date(time).toLocaleTimeString("en-CA", {
@@ -179,6 +179,11 @@ export function instructionText(
   previous: Step | undefined,
   style: Preferences["directions"],
 ) {
+  if (style === "cardinal" && step.kind === "walk" && step.bearing !== undefined) {
+    const points = ["north", "northeast", "east", "southeast", "south", "southwest", "west", "northwest"];
+    const heading = points[Math.round(((step.bearing % 360 + 360) % 360) / 45) % 8];
+    return `Head ${heading} along ${step.street || "the pedestrian path"}. Continue ${step.distance} metres.`;
+  }
   if (
     style === "left-right" ||
     step.kind !== "walk" ||
@@ -189,5 +194,5 @@ export function instructionText(
   const delta = (step.bearing - previous.bearing + 360) % 360,
     clock = Math.round(delta / 30) % 12 || 12;
   const phrase = `Toward ${clock} o'clock, along ${step.street || "the pedestrian path"}. Continue ${step.distance} metres.`;
-  return style === "both" ? step.text + " " + phrase : phrase;
+  return phrase;
 }

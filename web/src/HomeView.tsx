@@ -3,7 +3,7 @@ import {
   Mic,
   Keyboard,
   Star,
-  LocateFixed,
+  Compass,
   Clock,
   Route as RouteIcon,
   Map as MapIcon,
@@ -97,8 +97,8 @@ export default function HomeView(p: Props) {
           </div>
         )}
         <button className="where-button" onClick={p.where}>
-          <LocateFixed size={52} />
-          Where am I?
+          <Compass size={52} />
+          Compass
         </button>
         <button
           className="last-trip outline-button"

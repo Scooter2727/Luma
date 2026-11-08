@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ArrowLeft, Play, Square, Volume2, VolumeX } from "lucide-react";
 import type { Route } from "../model";
-import { saved } from "../model";
+import { saved, request } from "../model";
+import { freshFix } from "./orientationEngine";
 import { useTargetDemo } from "./useTargetDemo";
 import { targetLabels } from "./targetDemo";
 import { useCompassDial } from "./useCompassDial";
@@ -43,7 +44,7 @@ export default function CompassMode({
   speak,
   back,
 }: {
-  route: Route;
+  route?: Route;
   entry: { permission: Promise<string | null> };
   screenReader: boolean;
   speak: (text: string) => void;
@@ -54,6 +55,7 @@ export default function CompassMode({
   const face = useRef<HTMLDivElement>(null);
   useScreenTransition(modal, "compass", true, false);
   const [demoRunning, setDemoRunning] = useState(false);
+  const [road, setRoad] = useState<string | null>(null);
   const {
     result,
     readHeading,
@@ -62,6 +64,7 @@ export default function CompassMode({
     northReference,
     requestCompass,
     hapticsAvailable,
+    fix,
   } = useOrientationTracking({
     route,
     enabled: true,
@@ -70,8 +73,28 @@ export default function CompassMode({
     haptics: !demoRunning && saved("compass-haptics", true),
     voice: !demoRunning && saved("compass-voice", true) && !screenReader,
     config: defaults,
-    speak,
+    speak: (text: string): void => {
+      if (text.startsWith("Direction uncertain.") && readHeading().heading !== null) return;
+      speak(text);
+    },
   });
+  const roadKey = fix && freshFix(fix, Date.now())
+    ? `${fix.coordinates[0].toFixed(4)},${fix.coordinates[1].toFixed(4)}`
+    : null;
+  useEffect(() => {
+    setRoad(null);
+    if (!roadKey) return;
+    const controller = new AbortController();
+    const [longitude, latitude] = roadKey.split(",");
+    const timer = window.setTimeout(() => {
+      request<{ street: string | null }>(
+        `/api/current-road?longitude=${longitude}&latitude=${latitude}`,
+        { signal: controller.signal },
+      ).then((value) => { if (!controller.signal.aborted) setRoad(value.street); })
+        .catch(() => {});
+    }, 400);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [roadKey]);
   const targetGame = useTargetDemo(readHeading, saved("compass-haptics", true));
   const demo = targetGame.demo;
   const demoState = demo?.state ?? "idle";
@@ -128,6 +151,7 @@ export default function CompassMode({
       ref={modal}
       className="compass-fullscreen"
       data-demo-running={!!demo}
+      data-demo-state={demoState}
       role="dialog"
       aria-modal="true"
       aria-label="Compass mode"
@@ -238,18 +262,6 @@ export default function CompassMode({
                   {name}
                 </text>
               ))}
-              {heading !== null && (
-                <>
-                  <path
-                    d="M160 88 145 146 160 137 175 146Z"
-                    className="compass-needle-north"
-                  />
-                  <path
-                    d="M160 232 145 174 160 183 175 174Z"
-                    className="compass-needle-south"
-                  />
-                </>
-              )}
               {demo && (
                 <g className="compass-target">
                   <circle cx={targetX} cy={targetY} r="12" />
@@ -292,9 +304,8 @@ export default function CompassMode({
           ) : (
             labels[result.state]
           )}
-          <span className="sr-only">
-            . {compassReason || compassWarning || (demo ? "" : result.reason)}
-            {!hapticsAvailable ? " Vibration unavailable in this browser." : ""}
+          <span className="compass-road">
+            {road ? `Near ${road}` : "Road name unavailable"}
           </span>
         </p>
       </div>
