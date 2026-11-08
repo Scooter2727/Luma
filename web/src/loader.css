@@ -80,3 +80,16 @@
     animation: none;
   }
 }
+
+.picker-input .luma-loader {
+  padding: 0;
+  background: transparent;
+}
+
+.picker-input .luma-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}

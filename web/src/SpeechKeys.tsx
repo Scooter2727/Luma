@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { CheckCircle2, KeyRound, XCircle } from "lucide-react";
+import { LumaLoader } from "./LumaLoader";
 
 type Saved = { saved: boolean; hint: string };
 type Summary = {
@@ -154,6 +155,12 @@ export function SpeechKeys({ onSaved }: { onSaved: () => void }) {
           {busy === "checking" ? "Checking…" : "Check keys"}
         </button>
       </div>
+      {(busy === "saving" || busy === "checking") && (
+        <LumaLoader
+          label={busy === "saving" ? "Saving keys…" : "Checking keys…"}
+          size={72}
+        />
+      )}
       <div role="status" className="key-results">
         {error && <p className="key-result bad">{error}</p>}
         {check &&

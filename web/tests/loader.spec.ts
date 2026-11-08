@@ -28,3 +28,16 @@ test("route planning shows the Luma loader and keeps the slow-network note", asy
     page.getByText("The first journey can take longer"),
   ).toBeVisible();
 });
+
+test("searching for a place shows a small Luma loader", async ({ page }) => {
+  await page.route("**/api/search?*", () => new Promise(() => {}));
+  await page.goto("/");
+  await finishOnboarding(page);
+  await page.getByRole("button", { name: "Type", exact: true }).click();
+  await page.getByLabel("Destination").fill("Queen");
+  const loader = page
+    .getByRole("status")
+    .filter({ hasText: "Searching places…" });
+  await expect(loader).toBeVisible();
+  await expect(loader).toHaveClass(/luma-loader/);
+});

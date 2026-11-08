@@ -47,6 +47,7 @@ import {
   stopAiSpeech,
   unlockAiAudio,
 } from "./speech";
+import { LumaLoader } from "./LumaLoader";
 import "./app.css";
 type View =
   | "home"
@@ -724,6 +725,9 @@ export default function App() {
                     : "Luma controls"
               }
             >
+              {!loaded && !onboarding && (
+                <LumaLoader label="Opening Luma…" />
+              )}
               {view === "home" && (
                 <HomeView
                   theme={prefs.theme}
