@@ -3,8 +3,6 @@ import {
   ArrowLeft,
   ArrowRight,
   Map as MapIcon,
-  MapPin,
-  LocateFixed,
   Footprints,
   Bus,
   SlidersHorizontal,
@@ -45,8 +43,6 @@ type PlannerProps = PreferenceProps & {
 };
 export function JourneyPlanner(p: PlannerProps) {
   const [scheduling, setScheduling] = useState(!!p.departure);
-  const date = (v: string) =>
-    v.slice(0, 4) + "-" + v.slice(4, 6) + "-" + v.slice(6, 8);
   return (
     <>
       <header className="page-header">
@@ -70,16 +66,6 @@ export function JourneyPlanner(p: PlannerProps) {
           }}
           onValidityChange={p.setStartValid}
         />
-        <div className="endpoint-tools">
-          <button onClick={p.locate}>
-            <LocateFixed size={20} />
-            Use my location
-          </button>
-          <button onClick={() => p.map("start")}>
-            <MapPin size={20} />
-            Choose start on map
-          </button>
-        </div>
         <PlacePicker
           label="To"
           value={p.end}
@@ -90,10 +76,6 @@ export function JourneyPlanner(p: PlannerProps) {
           onValidityChange={p.setEndValid}
         />
         <div className="endpoint-tools">
-          <button onClick={() => p.map("end")}>
-            <MapPin size={20} />
-            Choose end on map
-          </button>
           {p.mode === "bus" && (
             <button className="schedule-toggle" aria-expanded={scheduling} aria-controls="departure-time" onClick={() => {
               if (scheduling) { p.setDeparture(""); setScheduling(false); }
@@ -121,11 +103,8 @@ export function JourneyPlanner(p: PlannerProps) {
           Bus + walk
         </button>
       </div>
-      {p.mode === "bus" && (
+      {p.mode === "bus" && scheduling && (
         <div className="departure-picker">
-          <div className="departure-summary">
-            <span>{p.departure ? "Scheduled departure" : "Leaving now"}</span>
-          </div>
           {scheduling && <label className="select-label" id="departure-time">
             Leave at (Toronto time)
             <input
@@ -134,16 +113,6 @@ export function JourneyPlanner(p: PlannerProps) {
               onChange={(e) => p.setDeparture(e.target.value)}
             />
           </label>}
-          <p className="helper">
-            Scheduled TTC times.{" "}
-            {p.timetable && (
-              <>
-                Feed: {date(p.timetable.service_start)} to{" "}
-                {date(p.timetable.service_end)}.{" "}
-              </>
-            )}
-            Up to one same-stop transfer.
-          </p>
         </div>
       )}
       <details className="preferences-details">

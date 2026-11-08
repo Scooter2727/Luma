@@ -26,9 +26,15 @@
 * {
   box-sizing: border-box;
   scrollbar-width: none;
+  overscroll-behavior: none;
 }
 *::-webkit-scrollbar {
   display: none;
+}
+html,
+body {
+  height: 100%;
+  overflow: hidden;
 }
 body {
   margin: 0;
@@ -1647,7 +1653,6 @@ h1:focus {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  min-height: calc(100dvh - 82px);
 }
 .location-chip {
   display: flex;
@@ -1997,7 +2002,7 @@ h1:focus {
     font-size: 22px;
   }
   .navigation-screen {
-    min-height: calc(100dvh - 28px);
+    min-height: calc(100dvh - 12px - env(safe-area-inset-top) - max(16px, env(safe-area-inset-bottom)));
   }
   .navigation-controls {
     min-height: 340px;
@@ -2025,9 +2030,6 @@ h1:focus {
   }
   .navigation-instruction .instruction-summary {
     font-size: 22px;
-  }
-  .report-screen {
-    min-height: calc(100dvh - 126px - env(safe-area-inset-bottom));
   }
   .feature-card {
     max-width: 100%;

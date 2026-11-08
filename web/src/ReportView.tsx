@@ -252,7 +252,6 @@ export default function ReportView({
             <Mic size={68} />
             {listening ? "Listening…" : "Say what’s wrong"}
           </button>
-          <h2>Or tap</h2>
           <div className="report-quick">
             {issueTypes.slice(0, 3).map((t) => (
               <button key={t.id} onClick={() => setIssue(t.id)}>

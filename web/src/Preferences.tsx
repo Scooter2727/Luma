@@ -378,7 +378,6 @@ export function Settings(
       )}
       {!section && (
         <>
-          <SpeedCard {...props} />
           <div className="settings-grid">
             {groups.map((g) => (
               <button key={g.id} onClick={() => setSection(g.id)}>
