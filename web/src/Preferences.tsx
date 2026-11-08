@@ -14,6 +14,7 @@ import {
   Headphones,
   Lock,
   SlidersHorizontal,
+  Sparkles,
 } from "lucide-react";
 import { CrosswalkIcon } from "./Icons";
 import { logoForTheme } from "./brand";
@@ -22,7 +23,55 @@ export type PreferenceProps = {
   prefs: Preferences;
   change: (values: Partial<Preferences>) => void;
   speak: (text: string) => void;
+  /** The server has AI voice keys configured. */
+  speechAvailable?: boolean;
+  /** AI voice is configured and has not failed repeatedly this session. */
+  aiVoiceReady?: boolean;
+  testAiVoice?: (text: string) => void;
 };
+const SAMPLE_INSTRUCTION =
+  "This is a sample Luma instruction. Turn right onto Queen Street West.";
+export function VoiceEngineStatus({
+  prefs,
+  speechAvailable,
+  aiVoiceReady,
+}: Pick<PreferenceProps, "prefs" | "speechAvailable" | "aiVoiceReady">) {
+  const text = prefs.screenReader
+    ? "Using screen reader announcements"
+    : prefs.aiVoice && speechAvailable && aiVoiceReady
+      ? "Using AI voice"
+      : prefs.aiVoice && speechAvailable
+        ? "Using device voice. AI voice is unavailable right now."
+        : "Using device voice";
+  return (
+    <p className="voice-engine" role="status">
+      {text}
+    </p>
+  );
+}
+export function AiVoiceChoice({
+  prefs,
+  change,
+  speechAvailable,
+}: Pick<PreferenceProps, "prefs" | "change" | "speechAvailable">) {
+  if (!speechAvailable || prefs.screenReader) return null;
+  return (
+    <label className="toggle-card">
+      <span>
+        <strong>Try AI voice (experimental)</strong>
+        <small>
+          A more natural voice. Directions keep the same facts, and Luma
+          switches to your device voice if AI voice is slow or unavailable.
+        </small>
+      </span>
+      <input
+        type="checkbox"
+        checked={prefs.aiVoice}
+        onChange={(e) => change({ aiVoice: e.target.checked })}
+      />
+    </label>
+  );
+}
 export const themes = [
   { id: "default", name: "Luma", colors: ["#5865F2", "#FF8A4C", "#2CCBA8"] },
   {
@@ -167,7 +216,8 @@ export function DisplayChoices({
     </div>
   );
 }
-export function SpeedCard({ prefs, change, speak }: PreferenceProps) {
+export function SpeedCard(props: PreferenceProps) {
+  const { prefs, change, speak, speechAvailable, testAiVoice } = props;
   return (
     <section className="speed-card" aria-labelledby="speed-heading">
       <h2 id="speed-heading">Speech speed</h2>
@@ -196,17 +246,25 @@ export function SpeedCard({ prefs, change, speak }: PreferenceProps) {
           <Plus size={38} />
         </button>
       </div>
-      <button
-        className="voice-test"
-        onClick={() =>
-          speak(
-            "This is a sample Luma instruction. Turn right onto Queen Street West.",
-          )
-        }
-      >
-        <Volume2 size={30} />
-        Test voice
-      </button>
+      <div className="voice-tests">
+        <button
+          className="voice-test"
+          onClick={() => speak(SAMPLE_INSTRUCTION)}
+        >
+          <Volume2 size={30} />
+          Test voice
+        </button>
+        {speechAvailable && !prefs.screenReader && testAiVoice && (
+          <button
+            className="voice-test"
+            onClick={() => testAiVoice(SAMPLE_INSTRUCTION)}
+          >
+            <Sparkles size={30} />
+            Test AI voice
+          </button>
+        )}
+      </div>
+      <VoiceEngineStatus {...props} />
     </section>
   );
 }
@@ -284,6 +342,8 @@ export function Onboarding(
                 </label>
               ))}
             </fieldset>
+            <AiVoiceChoice {...props} />
+            <VoiceEngineStatus {...props} />
           </>
         )}
         {step === 3 && <DirectionsChoices {...props} />}{" "}
@@ -383,7 +443,12 @@ export function Settings(
           </div>
         </>
       )}
-      {section === "voice" && <SpeedCard {...props} />}{" "}
+      {section === "voice" && (
+        <>
+          <SpeedCard {...props} />
+          <AiVoiceChoice {...props} />
+        </>
+      )}{" "}
       {section === "directions" && <DirectionsChoices {...props} />}
       {section === "crossings" && <CrossingChoices {...props} />}{" "}
       {section === "display" && <DisplayChoices {...props} />}{" "}
@@ -414,6 +479,11 @@ export function Settings(
             GPS and microphone access are requested only when you use those
             controls. Browser speech recognition may use your browser provider’s
             speech service.
+          </p>
+          <p>
+            {props.speechAvailable
+              ? "AI voice is off unless you turn it on in Voice settings. When it is on, route instruction text, including street and destination names, is sent through this prototype’s server to Google Gemini for wording and to ElevenLabs for speech. GPS coordinates are not sent."
+              : "AI voice is not available on this deployment because it has not been configured. Luma uses your device voice."}
           </p>
           <button className="outline-button" onClick={props.repeatSetup}>
             <SlidersHorizontal />

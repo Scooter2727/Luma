@@ -37,7 +37,10 @@ import type { Coord, Feature, Place, Preferences, Route } from "./model";
 import {
   aiSpeechAvailable,
   cancelAllSpeech,
+  loadSpeechStatus,
+  onAiSpeechChange,
   playAiSpeech,
+  resetAiSpeechSession,
   stopAiSpeech,
 } from "./speech";
 import "./app.css";
@@ -164,6 +167,15 @@ export default function App() {
     currentStep = route?.steps[step];
   const change = (values: Partial<Preferences>) =>
     setPrefs((p) => ({ ...p, ...values }));
+  const [speechAvailable, setSpeechAvailable] = useState(false),
+    [aiVoiceReady, setAiVoiceReady] = useState(aiSpeechAvailable);
+  useEffect(() => {
+    const unsubscribe = onAiSpeechChange(() =>
+      setAiVoiceReady(aiSpeechAvailable()),
+    );
+    void loadSpeechStatus().then(setSpeechAvailable);
+    return unsubscribe;
+  }, []);
   const speechTurn = useRef(0);
   function deviceSpeak(text: string) {
     if (!("speechSynthesis" in window)) return;
@@ -186,6 +198,18 @@ export default function App() {
     }
     stopAiSpeech();
     deviceSpeak(text);
+  }
+  function testAiVoice(text: string) {
+    setNotice(text);
+    const turn = ++speechTurn.current;
+    resetAiSpeechSession();
+    window.speechSynthesis?.cancel();
+    void playAiSpeech(text, prefs.rate).then((outcome) => {
+      if (outcome !== "failed" || turn !== speechTurn.current) return;
+      const fallback = "AI voice is unavailable right now. " + text;
+      setNotice(fallback);
+      if (!prefs.screenReader) deviceSpeak(fallback);
+    });
   }
   useScreenTransition(
     panel,
@@ -486,7 +510,14 @@ export default function App() {
     setOnboarding(false);
     setView("home");
   }
-  const prefProps = { prefs, change, speak };
+  const prefProps = {
+    prefs,
+    change,
+    speak,
+    speechAvailable,
+    aiVoiceReady,
+    testAiVoice,
+  };
   const selectedPlace = selected
     ? {
         id: selected.properties.id,

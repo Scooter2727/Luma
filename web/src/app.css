@@ -825,6 +825,22 @@ h1:focus {
   font-size: 21px;
   font-weight: 700;
 }
+.voice-tests {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+.voice-engine {
+  font-size: 17px;
+  font-weight: 700;
+}
+.setup-body .voice-engine,
+.settings-content > .voice-engine {
+  color: var(--muted);
+}
+.large-text .voice-engine {
+  font-size: 20px;
+}
 .settings-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
