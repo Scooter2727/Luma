@@ -2,7 +2,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: calc(var(--size) * 0.18);
   width: max-content;
   max-width: 100%;
   background: var(--surface, #fff);
@@ -14,6 +14,8 @@
   width: var(--size);
   height: var(--size);
   display: block;
+  overflow: visible;
+  isolation: isolate;
 }
 
 .luma-mark circle {
@@ -25,49 +27,43 @@
 @keyframes luma-o {
   0%,
   100% {
-    transform: scale(1);
-    opacity: 1;
+    transform: translate(0, 0) scale(1);
   }
   50% {
-    transform: scale(1.06);
-    opacity: 0.72;
+    transform: translate(0, -22%) scale(0.82);
   }
 }
 
 @keyframes luma-b {
   0%,
   100% {
-    transform: scale(1);
-    opacity: 0.72;
+    transform: translate(0, 0) scale(1);
   }
   50% {
-    transform: scale(1.06);
-    opacity: 1;
+    transform: translate(-20%, 14%) scale(0.82);
   }
 }
 
 @keyframes luma-m {
   0%,
   100% {
-    transform: scale(1.03);
-    opacity: 0.85;
+    transform: translate(0, 0) scale(1);
   }
   50% {
-    transform: scale(0.96);
-    opacity: 1;
+    transform: translate(20%, 14%) scale(0.82);
   }
 }
 
 .c-orange {
-  animation: luma-o 1.8s ease-in-out infinite;
+  animation: luma-o 1.8s cubic-bezier(0.65, 0, 0.35, 1) infinite;
 }
 
 .c-blue {
-  animation: luma-b 1.8s ease-in-out infinite;
+  animation: luma-b 1.8s cubic-bezier(0.65, 0, 0.35, 1) infinite;
 }
 
 .c-mint {
-  animation: luma-m 1.8s ease-in-out infinite;
+  animation: luma-m 1.8s cubic-bezier(0.65, 0, 0.35, 1) infinite;
 }
 
 .luma-label {
