@@ -61,7 +61,9 @@ async function boot(page: Page, width = 390) {
       onerror: (() => void) | null = null;
       onend: (() => void) | null = null;
       start() {}
-      stop() {}
+      stop() {
+        this.onend?.();
+      }
     }
     const wr = window as unknown as {
       SpeechRecognition?: typeof FakeRecognition;

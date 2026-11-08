@@ -36,7 +36,9 @@ async function reachHome(page: Page, width = 1440, height = 1000) {
       onerror: (() => void) | null = null;
       onend: (() => void) | null = null;
       start() {}
-      stop() {}
+      stop() {
+        this.onend?.();
+      }
     }
     const w = window as unknown as {
       SpeechRecognition?: typeof FakeRecognition;

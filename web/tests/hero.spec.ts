@@ -48,7 +48,9 @@ test("Ask Luma skips setup and lands on home", async ({ page }) => {
       onerror: (() => void) | null = null;
       onend: (() => void) | null = null;
       start() {}
-      stop() {}
+      stop() {
+        this.onend?.();
+      }
     }
     const w = window as unknown as {
       SpeechRecognition?: typeof FakeRecognition;
@@ -77,7 +79,9 @@ test("Ask Luma opens voice input after setup", async ({ page }) => {
       onerror: (() => void) | null = null;
       onend: (() => void) | null = null;
       start() {}
-      stop() {}
+      stop() {
+        this.onend?.();
+      }
     }
     const w = window as unknown as {
       SpeechRecognition?: typeof FakeRecognition;

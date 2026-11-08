@@ -12,7 +12,9 @@ async function boot(page: Page, width = 390, height = 844) {
       onerror: (() => void) | null = null;
       onend: (() => void) | null = null;
       start() {}
-      stop() {}
+      stop() {
+        this.onend?.();
+      }
     }
     const w = window as unknown as {
       SpeechRecognition?: typeof FakeRecognition;
@@ -407,7 +409,9 @@ test("navigation, actual crossing state and reporting keep the current route ste
       onerror: (() => void) | null = null;
       onend: (() => void) | null = null;
       start() {}
-      stop() {}
+      stop() {
+        this.onend?.();
+      }
     }
     const w = window as unknown as {
       SpeechRecognition?: typeof FakeRecognition;
