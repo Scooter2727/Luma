@@ -6,8 +6,6 @@ import {
   CircleDot,
   Mic,
   VolumeX,
-  MapPin,
-  LocateFixed,
   ArrowRight,
   Trash2,
   Grid2X2,
@@ -107,7 +105,6 @@ export default function ReportView({
   initialLocation,
   back,
   backLabel,
-  locate,
   dictate,
   listening,
   speak,
@@ -117,7 +114,6 @@ export default function ReportView({
     [valid, setValid] = useState(true),
     [notes, setNotes] = useState(""),
     [busy, setBusy] = useState(false),
-    [locating, setLocating] = useState(false),
     [error, setError] = useState(""),
     [confirmation, setConfirmation] = useState<ReportRecord | null>(null);
   const notesInput = useRef<HTMLTextAreaElement>(null);
@@ -210,12 +206,6 @@ export default function ReportView({
         <h1>
           {confirmation ? "Report saved" : issue ? "Confirm report" : "Report"}
         </h1>
-        {!issue && !confirmation && (
-          <span className="location-chip">
-            <MapPin size={21} />
-            {location.name}
-          </span>
-        )}
       </header>
       {confirmation ? (
         <>
@@ -301,35 +291,15 @@ export default function ReportView({
             }}
             onValidityChange={setValid}
           />
-          {locating && <LumaLoader label="Finding location…" size={72} />}
-          <button
-            type="button"
-            className="text-action"
-            disabled={locating}
-            onClick={async () => {
-              setLocating(true);
-              try {
-                setLocation(await locate());
-                setValid(true);
-              } catch (e) {
-                setError((e as Error).message);
-              } finally {
-                setLocating(false);
-              }
-            }}
-          >
-            <LocateFixed size={22} />
-            {locating ? "Finding location…" : "Use my location"}
-          </button>
-          <p className="helper">
+          {(location.locationSource === "route_preview" || location.locationSource === "gps") && <p className="helper">
             {location.locationSource === "route_preview"
               ? "This is the selected route-preview position, not GPS. Confirm the location before saving."
               : location.locationSource === "gps"
                 ? "GPS location. Accuracy approximately " +
                   Math.round(location.accuracy || 0) +
                   " metres."
-                : "Confirm where the issue is located."}
-          </p>
+                : null}
+          </p>}
           <label className="notes-label" htmlFor="report-notes">
             What happened? <span>(optional)</span>
           </label>

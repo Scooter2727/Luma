@@ -111,7 +111,7 @@ export default function App() {
   const [onboarding, setOnboarding] = useState(false);
   const [showHero, setShowHero] = useState(true);
   const [askOnHome, setAskOnHome] = useState(false);
-  const panel = useRef<HTMLElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
   const [homeCompass, setHomeCompass] = useState<{
     permission: Promise<string | null>;
     trigger: HTMLElement | null;
@@ -228,9 +228,7 @@ export default function App() {
   useScreenTransition(
     panel,
     `${view}:${showOptions}`,
-    !onboarding && !showHero,
-    true,
-    true,
+    !onboarding && !showHero && view !== "settings",
   );
   useEffect(() => {
     document.documentElement.dataset.theme = prefs.theme;
@@ -711,7 +709,6 @@ export default function App() {
             </div>
           ) : (
             <section
-              ref={panel}
               id="panel"
               className={
                 "panel " +
@@ -731,6 +728,7 @@ export default function App() {
               {!loaded && !onboarding && (
                 <LumaLoader label="Opening Luma…" />
               )}
+              <div className="page-content" ref={panel}>
               {view === "home" && (
                 <HomeView
                   theme={prefs.theme}
@@ -1006,6 +1004,7 @@ export default function App() {
                   </button>
                 </div>
               )}
+              </div>
             </section>
           )}
         </main>
