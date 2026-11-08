@@ -117,3 +117,66 @@ test("screen reader mode hides the AI voice choice", async ({ page }) => {
     "Using screen reader announcements",
   );
 });
+
+async function previewWalk(page: Page) {
+  await page
+    .getByRole("button", { name: "Example journey Try a walk" })
+    .click();
+  await page
+    .getByRole("button", { name: "Preview route 1", exact: true })
+    .click({ timeout: 65000 });
+}
+async function recordDeviceSpeech(page: Page) {
+  await page.addInitScript(() => {
+    const spoken: string[] = [];
+    (window as unknown as { deviceSpoken: string[] }).deviceSpoken = spoken;
+    speechSynthesis.speak = (u: SpeechSynthesisUtterance) =>
+      void spoken.push(u.text);
+  });
+}
+
+test("route preview speaks rephrased steps and prefetches the next one", async ({
+  page,
+}) => {
+  const rephrased: number[] = [];
+  await page.route("**/api/speech/rephrase", (r) => {
+    const steps = r.request().postDataJSON().steps as { text: string }[];
+    rephrased.push(steps.length);
+    return r.fulfill({ json: { texts: steps.map((s) => "Natural. " + s.text), rephrased: steps.map(() => true) } });
+  });
+  await recordDeviceSpeech(page);
+  const texts = await boot(page, true, "audio", { "luma-ai-voice": "true" });
+  await previewWalk(page);
+  await expect.poll(() => texts.length).toBeGreaterThanOrEqual(2);
+  expect(rephrased.length).toBeGreaterThan(0);
+  // The current step and the prefetched next step, in either network order.
+  expect(texts.slice(0, 2).sort()).toEqual([
+    expect.stringMatching(/^Natural\. Head east along Front St W/),
+    expect.stringMatching(/^Natural\. Join the mapped pedestrian path/),
+  ]);
+  await expect(page.locator(".navigation-screen")).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => (window as unknown as { deviceSpoken: string[] }).deviceSpoken,
+    ),
+  ).toEqual([]);
+});
+
+test("AI voice failure during preview falls back to the device voice wording", async ({
+  page,
+}) => {
+  await page.route("**/api/speech/rephrase", (r) => {
+    const steps = r.request().postDataJSON().steps as { text: string }[];
+    return r.fulfill({ json: { texts: steps.map((s) => "Natural. " + s.text), rephrased: steps.map(() => true) } });
+  });
+  await recordDeviceSpeech(page);
+  await boot(page, true, "503", { "luma-ai-voice": "true" });
+  await previewWalk(page);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as unknown as { deviceSpoken: string[] }).deviceSpoken,
+      ),
+    )
+    .toEqual([expect.stringMatching(/^Join the mapped pedestrian path/)]);
+});

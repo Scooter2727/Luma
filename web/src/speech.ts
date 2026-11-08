@@ -112,6 +112,12 @@ export function cancelAllSpeech() {
   stopAiSpeech();
   globalThis.speechSynthesis?.cancel();
 }
+/** Warm the audio cache for text that is likely to be spoken next. */
+export function prefetchAiSpeech(text: string) {
+  if (!aiSpeechAvailable() || blobs.has(text) || pending.has(text)) return;
+  const request = download(text).finally(() => pending.delete(text));
+  pending.set(text, request);
+}
 export async function playAiSpeech(
   text: string,
   rate: number,

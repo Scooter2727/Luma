@@ -199,3 +199,14 @@ export function instructionText(
   const phrase = `Toward ${clock} o'clock, along ${step.street || "the pedestrian path"}. Continue ${step.distance} metres.`;
   return phrase;
 }
+/** Wording for the AI voice. Server ai_text is used only if it was built for the current directions style. */
+export function aiInstructionText(
+  route: Route,
+  index: number,
+  style: Preferences["directions"],
+) {
+  const step = route.steps[index];
+  return route.ai_directions === style && step.ai_text
+    ? step.ai_text
+    : instructionText(step, route.steps[index - 1], style);
+}

@@ -31,6 +31,7 @@ import {
   saved,
   request,
   instructionText,
+  aiInstructionText,
   WALKING_SPEED,
 } from "./model";
 import type { Coord, Feature, Place, Preferences, Route } from "./model";
@@ -40,6 +41,7 @@ import {
   loadSpeechStatus,
   onAiSpeechChange,
   playAiSpeech,
+  prefetchAiSpeech,
   resetAiSpeechSession,
   stopAiSpeech,
 } from "./speech";
@@ -184,13 +186,14 @@ export default function App() {
     u.rate = prefs.rate;
     window.speechSynthesis.speak(u);
   }
-  function speak(text: string) {
+  /** aiText is alternative wording for the AI voice only; the notice and device voice always use text. */
+  function speak(text: string, aiText = text) {
     setNotice(text);
     const turn = ++speechTurn.current;
     if (prefs.screenReader) return;
     if (prefs.aiVoice && aiSpeechAvailable()) {
       window.speechSynthesis?.cancel();
-      void playAiSpeech(text, prefs.rate).then((outcome) => {
+      void playAiSpeech(aiText, prefs.rate).then((outcome) => {
         if (outcome === "failed" && turn === speechTurn.current)
           deviceSpeak(text);
       });
@@ -316,7 +319,15 @@ export default function App() {
     if (view !== "navigate" || !route || !currentStep) return;
     speak(
       instructionText(currentStep, route.steps[step - 1], prefs.directions),
+      aiInstructionText(route, step, prefs.directions),
     );
+    if (
+      prefs.aiVoice &&
+      !prefs.screenReader &&
+      aiSpeechAvailable() &&
+      step + 1 < route.steps.length
+    )
+      prefetchAiSpeech(aiInstructionText(route, step + 1, prefs.directions));
     if (currentStep.crossing) setPlaying(false);
   }, [view, step]);
   useEffect(() => {
@@ -478,6 +489,7 @@ export default function App() {
           walking_speed: WALKING_SPEED,
           mode,
           departure_time: departure || null,
+          directions: prefs.directions,
         }),
       });
       if (number !== requestNumber.current || key !== currentKey.current)
@@ -486,11 +498,47 @@ export default function App() {
       setRouteIndex(0);
       setStep(0);
       setNotice(d.routes.length + " route options found.");
+      if (prefs.aiVoice && !prefs.screenReader && aiSpeechAvailable())
+        for (const r of d.routes) void rephraseRoute(r, number);
     } catch (e) {
       if (number === requestNumber.current) setError((e as Error).message);
     } finally {
       if (number === requestNumber.current) setBusy(false);
     }
+  }
+  /** Replace ai_text with Gemini wording in the background; route planning never waits for it. */
+  async function rephraseRoute(r: Route, number: number) {
+    try {
+      const { texts } = await request<{ texts: string[] }>(
+        "/api/speech/rephrase",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            steps: r.steps.map((s) => ({
+              text: s.ai_text || s.text,
+              street: s.street || null,
+              distance: s.distance,
+              crossing: s.crossing,
+              audible: s.audible ?? null,
+              tactile: s.tactile ?? null,
+            })),
+          }),
+        },
+      );
+      if (number !== requestNumber.current || texts.length !== r.steps.length)
+        return;
+      setRoutes((current) =>
+        current.map((c) =>
+          c.id === r.id
+            ? {
+                ...c,
+                steps: c.steps.map((s, i) => ({ ...s, ai_text: texts[i] })),
+              }
+            : c,
+        ),
+      );
+    } catch {}
   }
   function startPreview() {
     setStep(0);
