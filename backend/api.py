@@ -6,13 +6,14 @@ from typing import Literal
 import networkx as nx
 from fastapi import FastAPI,HTTPException,Query
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse,Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from pydantic import BaseModel,Field,field_validator
 from .walking import network,distance,walk_details,weight,ROOT
 from .transit import TZ,bus_journeys,feed_range
 from .reports import router as reports_router
+from . import config,speech_audio
 
 app=FastAPI(title='Luma',version='0.2.0')
 app.include_router(reports_router)
@@ -23,7 +24,8 @@ app.add_middleware(GZipMiddleware,minimum_size=1000)
 async def invalid_request(request,exc):
     # Do not echo malformed coordinate values (NaN/Infinity cannot be JSON encoded).
     message='; '.join('.'.join(str(p) for p in e['loc'] if p!='body')+': '+e['msg'] for e in exc.errors())
-    return JSONResponse(status_code=422,content={'detail':'Invalid journey request. '+message})
+    prefix='Invalid speech request. ' if request.url.path.startswith('/api/speech') else 'Invalid journey request. '
+    return JSONResponse(status_code=422,content={'detail':prefix+message})
 def category(row):
     c=row['category']
     if c=='crossing signal':return 'signal'
@@ -97,6 +99,22 @@ def finish_walk(g,path,req,depart,offsets,name,route_id):
     if offsets[1]>1:segments.append(dict(mode='connect',coordinates=[list(path[-1]),list(req.end)]))
     r.update(id=route_id,name=name,mode='walk',minutes=max(1,math.ceil(r['duration_seconds']/60)),distance=round(r['distance']),duration_seconds=math.ceil(r['duration_seconds']),departure_time=depart.isoformat(),arrival_time=datetime.fromtimestamp(depart.timestamp()+r['duration_seconds'],TZ).isoformat(),timing='estimated',snap_distances=[round(n) for n in offsets],segments=segments,coordinates=[list(req.start)]+r['coordinates']+[list(req.end)])
     return r
+SPEECH_UNAVAILABLE='AI voice is unavailable on this server. Luma uses the device voice instead.'
+class SpeechRequest(BaseModel):
+    text:str=Field(min_length=1,max_length=1000)
+    @field_validator('text')
+    @classmethod
+    def nonempty_text(cls,value):
+        if not value.strip():raise ValueError('Enter text to speak.')
+        return value.strip()
+@app.get('/api/speech/status')
+def speech_status():return {'available':config.speech_configured()}
+@app.post('/api/speech/synthesize')
+async def synthesize_speech(req:SpeechRequest):
+    if not config.speech_configured():raise HTTPException(503,SPEECH_UNAVAILABLE)
+    audio=await speech_audio.synthesize(req.text)
+    if audio is None:raise HTTPException(503,'AI voice could not be generated. Luma uses the device voice instead.')
+    return Response(audio,media_type='audio/mpeg',headers={'Cache-Control':'private, max-age=86400'})
 @app.get('/api/transit/meta')
 def transit_meta():return {'service_start':feed_range()[0],'service_end':feed_range()[1],'timing':'scheduled','timezone':'America/Toronto','max_bus_transfers':1,'max_access_walk_metres':1000}
 @app.post('/api/routes')
