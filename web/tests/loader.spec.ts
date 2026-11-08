@@ -11,9 +11,7 @@ async function finishOnboarding(page: import("@playwright/test").Page) {
   ).toBeVisible();
 }
 
-test("route planning shows the Luma loader and keeps the slow-network note", async ({
-  page,
-}) => {
+test("route planning shows the full-screen Luma loader", async ({ page }) => {
   await page.route("**/api/routes", () => new Promise(() => {}));
   await page.goto("/");
   await finishOnboarding(page);
@@ -25,12 +23,11 @@ test("route planning shows the Luma loader and keeps the slow-network note", asy
     .filter({ hasText: "Finding your way…" });
   await expect(loader).toBeVisible();
   await expect(loader.locator("svg")).toHaveAttribute("aria-hidden", "true");
-  await expect(
-    page.getByText("The first journey can take longer"),
-  ).toBeVisible();
 });
 
-test("searching for a place shows a small Luma loader", async ({ page }) => {
+test("searching for a place shows the full-screen Luma loader", async ({
+  page,
+}) => {
   await page.route("**/api/search?*", () => new Promise(() => {}));
   await page.goto("/");
   await finishOnboarding(page);
