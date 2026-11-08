@@ -211,16 +211,16 @@ export default function App() {
     const turn = ++speechTurn.current;
     unlockAiAudio();
     window.speechSynthesis?.cancel();
-    const play =
+    const runPlay = () =>
       turn === speechTurn.current
         ? playAiSpeech(text, prefs.rate)
         : Promise.resolve("stopped" as const);
     void (aiSpeechAvailable()
-      ? play
+      ? runPlay()
       : refreshSpeechStatus().then((available) => {
           setSpeechAvailable(available);
           setAiVoiceReady(aiSpeechAvailable());
-          return play;
+          return runPlay();
         })
     ).then((outcome) => {
       if (outcome !== "failed" || turn !== speechTurn.current) return;
